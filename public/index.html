@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E2EE Chat</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8fafc;--surface:#fff;--border:#e2e8f0;
+  --txt:#0f172a;--muted:#475569;--hint:#94a3b8;
+  --cyan:#0284c7;--cyn-l:#e0f2fe;--cyn-b:#7dd3fc;
+  --grn:#047857;--grn-l:#d1fae5;--grn-b:#6ee7b7;
+  --red:#dc2626;--red-l:#fee2e2;--red-b:#fca5a5;
+  --amb:#b45309;--amb-l:#fef3c7;--amb-b:#fcd34d;
+  --pur:#6d28d9;--pur-l:#ede9fe;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);font-size:14px;height:100vh;overflow:hidden}
+button{cursor:pointer;font-family:inherit}
+input,textarea{font-family:inherit}
+
+/* ── Auth / Unlock screen ── */
+.full-center{display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#e0f2fe,#ede9fe)}
+.auth-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 40px;width:420px;box-shadow:0 8px 32px rgba(0,0,0,.08)}
+.auth-logo{text-align:center;margin-bottom:28px}
+.auth-logo h1{font-size:22px;font-weight:700;color:var(--cyan)}
+.auth-logo p{font-size:12px;color:var(--muted);margin-top:4px}
+.auth-tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:24px}
+.auth-tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent}
+.auth-tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.fg{margin-bottom:16px}
+.fg label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.fg input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border-color .2s}
+.fg input:focus{border-color:var(--cyan)}
+.fg .hint{font-size:11px;color:var(--muted);margin-top:4px}
+.btn-primary{width:100%;padding:11px;border:none;border-radius:8px;background:var(--cyan);color:#fff;font-size:14px;font-weight:600;transition:background .2s}
+.btn-primary:hover{background:#0369a1}
+.btn-primary:disabled{background:var(--hint);cursor:not-allowed}
+.err-msg{font-size:12px;color:var(--red);background:var(--red-l);border:1px solid var(--red-b);border-radius:6px;padding:8px 12px;margin-bottom:12px}
+.loading-txt{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;min-height:18px}
+
+/* ── App layout ── */
+#app{display:none;height:100vh;flex-direction:column}
+#app.visible{display:flex}
+.app-body{display:flex;flex:1;overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{width:290px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sb-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.sb-user{display:flex;align-items:center;gap:10px}
+.avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.sb-name{font-size:14px;font-weight:600}
+.sb-status{font-size:11px;color:var(--grn)}
+.btn-icon{background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;color:var(--muted)}
+.btn-icon:hover{background:var(--bg)}
+
+/* Notification badge on add-contact button */
+.btn-icon.has-notif{color:var(--red);border-color:var(--red-b);background:var(--red-l)}
+
+.sb-search{padding:10px 14px;border-bottom:1px solid var(--border)}
+.sb-search input{width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;background:var(--bg)}
+
+.contacts-list{flex:1;overflow-y:auto}
+.contact-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.contact-item:hover{background:var(--bg)}
+.contact-item.active{background:var(--cyn-l)}
+.ci-info{flex:1;min-width:0}
+.ci-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-sub{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unread{background:var(--cyan);color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:2px 6px;flex-shrink:0}
+.key-warn{color:var(--amb);font-size:10px}
+
+.sb-footer{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px}
+.sb-footer button{flex:1;padding:7px;font-size:12px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted)}
+.sb-footer button:hover{background:var(--red-l);color:var(--red);border-color:var(--red-b)}
+
+/* ── Chat panel ── */
+.chat-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--hint);text-align:center;gap:8px}
+.chat-empty h3{font-size:18px;font-weight:600;color:var(--muted)}
+.chat-empty p{font-size:13px}
+
+.chat-active{display:none;flex:1;flex-direction:column;overflow:hidden}
+.chat-active.open{display:flex}
+
+.chat-hdr{padding:13px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px}
+.chat-hdr-info h3{font-size:15px;font-weight:600}
+.chat-hdr-info p{font-size:11px;color:var(--grn)}
+.e2ee-badge{margin-left:auto;background:var(--grn-l);color:var(--grn);border:1px solid var(--grn-b);border-radius:6px;font-size:10px;font-weight:700;padding:3px 8px;letter-spacing:.5px}
+
+.msgs{flex:1;overflow-y:auto;padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+.bubble{max-width:68%;display:flex;flex-direction:column}
+.bubble.sent{align-self:flex-end}
+.bubble.recv{align-self:flex-start}
+.bubble-body{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5}
+.sent .bubble-body{background:var(--cyan);color:#fff;border-bottom-right-radius:4px}
+.recv .bubble-body{background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:4px}
+.bubble-body.tamper{background:var(--red-l)!important;border:1px solid var(--red-b)!important;color:var(--red)!important}
+.bubble-meta{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:10px;color:var(--hint)}
+.sent .bubble-meta{justify-content:flex-end}
+.vbadge{color:var(--grn);font-weight:700}
+.tbadge{color:var(--red);font-weight:700}
+.typing-ind{font-size:12px;color:var(--muted);font-style:italic;padding:2px 20px;min-height:20px}
+.hist-loading{text-align:center;font-size:12px;color:var(--muted);padding:10px}
+.load-more{text-align:center;margin-bottom:4px}
+.load-more button{font-size:12px;color:var(--cyan);background:none;border:1px solid var(--border);border-radius:6px;padding:5px 14px}
+
+.chat-input{padding:12px 20px;border-top:1px solid var(--border);background:var(--surface);display:flex;gap:10px;align-items:flex-end}
+.msg-inp{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:22px;font-size:14px;outline:none;resize:none;max-height:120px;overflow-y:auto;line-height:1.5}
+.msg-inp:focus{border-color:var(--cyan)}
+.send-btn{padding:10px 20px;background:var(--cyan);color:#fff;border:none;border-radius:22px;font-size:14px;font-weight:600}
+.send-btn:hover{background:#0369a1}
+
+/* ── Modals ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:100}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:14px;padding:26px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.15);max-height:90vh;overflow-y:auto}
+.modal h2{font-size:16px;font-weight:700;margin-bottom:16px}
+.modal input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;margin-bottom:10px}
+.modal input:focus{border-color:var(--cyan)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+.btn-cancel{padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:none;font-size:13px;color:var(--muted)}
+.btn-danger{padding:8px 16px;border:1px solid var(--red-b);border-radius:8px;background:var(--red-l);font-size:13px;color:var(--red);font-weight:600}
+
+/* Search results */
+.search-results{max-height:240px;overflow-y:auto;margin-bottom:8px}
+.sr-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer}
+.sr-item:hover{background:var(--bg)}
+.sr-info{flex:1}
+.sr-name{font-size:13px;font-weight:600}
+.sr-sub{font-size:11px;color:var(--muted)}
+.sr-action button{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted)}
+.sr-action .sent-btn{color:var(--amb);border-color:var(--amb-b)}
+.sr-action .add-btn{color:var(--cyan);border-color:var(--cyn-b)}
+.sr-action .contact-badge{font-size:11px;color:var(--grn)}
+
+/* Request list */
+.req-item{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
+.req-info{flex:1}
+.req-name{font-size:13px;font-weight:600}
+.req-time{font-size:11px;color:var(--muted)}
+.req-actions{display:flex;gap:6px}
+.req-actions button{font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:none}
+.req-acc{color:var(--grn);border-color:var(--grn-b)!important;background:var(--grn-l)!important}
+.req-rej{color:var(--red);border-color:var(--red-b)!important}
+
+/* Toast */
+#toast{position:fixed;bottom:22px;right:22px;padding:11px 16px;border-radius:10px;font-size:13px;font-weight:600;z-index:999;display:none;max-width:320px;box-shadow:0 4px 20px rgba(0,0,0,.12)}
+#toast.success{background:var(--grn-l);color:var(--grn);border:1px solid var(--grn-b);display:block}
+#toast.warn   {background:var(--amb-l);color:var(--amb);border:1px solid var(--amb-b);display:block}
+#toast.error  {background:var(--red-l);color:var(--red);border:1px solid var(--red-b);display:block}
+</style>
+</head>
+<body>
+
+<!-- ════ AUTH SCREEN ════ -->
+<div id="auth-screen" class="full-center">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <h1>🔒 E2EE Chat</h1>
+      <p>End-to-End Encrypted · RSA-2048 · AES-256</p>
+    </div>
+    <div id="auth-err" class="err-msg" style="display:none"></div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="ui.tab('login')">Đăng nhập</button>
+      <button class="auth-tab"        onclick="ui.tab('register')">Đăng ký</button>
+    </div>
+    <form id="login-form" onsubmit="ui.doLogin(event)">
+      <div class="fg"><label>Tên đăng nhập</label><input id="lu" type="text" required placeholder="username"/></div>
+      <div class="fg"><label>Mật khẩu</label><input id="lp" type="password" required placeholder="••••••••"/></div>
+      <div class="fg"><label>Passphrase (giải mã khóa riêng tư)</label><input id="lpp" type="password" required placeholder="passphrase của bạn"/><p class="hint">Passphrase chỉ dùng trong browser, không gửi lên server</p></div>
+      <button class="btn-primary" id="login-btn" type="submit">Đăng nhập</button>
+    </form>
+    <form id="register-form" onsubmit="ui.doRegister(event)" style="display:none">
+      <div class="fg"><label>Tên đăng nhập</label><input id="ru" type="text" required placeholder="username (≥3 ký tự)"/></div>
+      <div class="fg"><label>Email</label><input id="re" type="email" required placeholder="email@example.com"/></div>
+      <div class="fg"><label>Mật khẩu</label><input id="rp" type="password" required placeholder="≥8 ký tự"/></div>
+      <div class="fg"><label>Passphrase (bảo vệ khóa riêng tư)</label><input id="rpp" type="password" required placeholder="Tạo một passphrase mạnh"/><p class="hint">⚠ Không thể khôi phục nếu quên passphrase</p></div>
+      <button class="btn-primary" id="reg-btn" type="submit">Đăng ký &amp; Tạo khóa RSA</button>
+    </form>
+    <div id="loading-txt" class="loading-txt"></div>
+  </div>
+</div>
+
+<!-- ════ UNLOCK SCREEN (reload) ════ -->
+<div id="unlock-screen" class="full-center" style="display:none">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <h1>🔒 E2EE Chat</h1>
+      <p>Nhập passphrase để tiếp tục phiên làm việc</p>
+    </div>
+    <div id="unlock-err" class="err-msg" style="display:none"></div>
+    <form onsubmit="ui.doUnlock(event)">
+      <div class="fg"><label>Passphrase</label><input id="unlock-pp" type="password" required placeholder="Passphrase của bạn" autofocus/></div>
+      <button class="btn-primary" type="submit">Mở khóa</button>
+    </form>
+    <div style="text-align:center;margin-top:14px"><button onclick="ui.forceLogout()" style="font-size:12px;color:var(--muted);background:none;border:none;text-decoration:underline">Đăng nhập tài khoản khác</button></div>
+  </div>
+</div>
+
+<!-- ════ APP ════ -->
+<div id="app">
+  <div class="app-body">
+    <div class="sidebar">
+      <div class="sb-head">
+        <div class="sb-user">
+          <div class="avatar" id="sb-av" style="background:var(--cyn-l);color:var(--cyan)">?</div>
+          <div>
+            <div class="sb-name" id="sb-name">–</div>
+            <div class="sb-status" id="sb-status">● online</div>
+          </div>
+        </div>
+        <button class="btn-icon" id="add-btn" onclick="ui.openAddModal()" title="Thêm liên hệ / Lời mời">👤+</button>
+      </div>
+      <div class="sb-search"><input type="text" placeholder="Tìm liên hệ..." oninput="ui.filterContacts(this.value)"/></div>
+      <div class="contacts-list" id="contacts-list"><div style="padding:24px;text-align:center;color:var(--hint);font-size:13px">Chưa có liên hệ</div></div>
+      <div class="sb-footer">
+        <button onclick="ui.openKeyModal()">🔑 Khóa RSA</button>
+        <button onclick="App.logout()">↪ Đăng xuất</button>
+      </div>
+    </div>
+
+    <div class="chat-panel">
+      <div class="chat-empty" id="chat-empty">
+        <h3>🔒 E2EE Chat</h3>
+        <p>Chọn một liên hệ để bắt đầu trò chuyện</p>
+        <p style="font-size:11px;color:var(--hint)">Mọi tin nhắn được mã hoá đầu cuối — server không đọc được</p>
+      </div>
+      <div class="chat-active" id="chat-active">
+        <div class="chat-hdr">
+          <div class="avatar" id="chat-av" style="background:var(--pur-l);color:var(--pur)">?</div>
+          <div class="chat-hdr-info">
+            <h3 id="chat-name">–</h3>
+            <p id="chat-status">online</p>
+          </div>
+          <div class="e2ee-badge">🔒 E2EE</div>
+        </div>
+        <div class="msgs" id="msgs">
+          <div class="load-more" id="load-more" style="display:none"><button onclick="ui.loadMore()">Tải thêm tin cũ</button></div>
+          <div class="hist-loading" id="hist-load" style="display:none">Đang tải lịch sử...</div>
+        </div>
+        <div class="typing-ind" id="typing-ind"></div>
+        <div class="chat-input">
+          <textarea class="msg-inp" id="msg-inp" rows="1" placeholder="Nhập tin nhắn..." onkeydown="ui.msgKey(event)" oninput="ui.msgInput(this)"></textarea>
+          <button class="send-btn" onclick="ui.send()">Gửi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODAL: Add contact / Requests ════ -->
+<div class="overlay" id="add-modal">
+  <div class="modal">
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px">
+      <button id="tab-search" onclick="ui.switchAddTab('search')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:none;color:var(--cyan);border-bottom:2px solid var(--cyan)">Tìm kiếm</button>
+      <button id="tab-reqs"   onclick="ui.switchAddTab('reqs')"   style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent">
+        Lời mời <span id="req-count-badge" style="background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;display:none">0</span>
+      </button>
+    </div>
+
+    <!-- Search tab -->
+    <div id="add-tab-search">
+      <input type="text" id="user-q" placeholder="Tìm theo username..." oninput="ui.userSearch(this.value)"/>
+      <div class="search-results" id="search-results"><p style="font-size:13px;color:var(--hint);padding:8px">Nhập ít nhất 2 ký tự để tìm...</p></div>
+    </div>
+
+    <!-- Requests tab -->
+    <div id="add-tab-reqs" style="display:none">
+      <div id="req-list"><p style="font-size:13px;color:var(--hint);padding:8px">Không có lời mời nào</p></div>
+    </div>
+
+    <div class="modal-actions"><button class="btn-cancel" onclick="ui.closeAddModal()">Đóng</button></div>
+  </div>
+</div>
+
+<!-- ════ MODAL: Key info ════ -->
+<div class="overlay" id="key-modal">
+  <div class="modal">
+    <h2>🔑 Quản lý khóa RSA</h2>
+    <div id="key-info" style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.8"></div>
+    <div class="fg"><label>Passphrase (để xác nhận tạo khóa mới)</label><input id="rev-pp" type="password" placeholder="Passphrase hiện tại"/></div>
+    <div class="fg"><label>Lý do thu hồi (tùy chọn)</label><input id="rev-reason" type="text" placeholder="Ví dụ: bị lộ khóa"/></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="ui.closeKeyModal()">Đóng</button>
+      <button class="btn-danger" onclick="ui.doRevokeKey()">Thu hồi &amp; Tạo khóa mới</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/crypto.js"></script>
+<script src="/app.js"></script>
+<script>
+// ─────────────────────────────────────────────
+//  UI module
+// ─────────────────────────────────────────────
+const ui = (() => {
+  let _loadMorePage = 1;
+  let _loadMoreCID  = null;
+  let _searchTimer  = null;
+  let _typingTimer  = null;
+
+  // ── helpers ──
+  const $  = id => document.getElementById(id);
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function toast(msg, type='success') {
+    const t = $('toast'); t.textContent = msg; t.className = type;
+    clearTimeout(t._t); t._t = setTimeout(() => t.style.display='none', 3500);
+  }
+
+  // ── Auth tabs ──
+  function tab(name) {
+    $('login-form').style.display    = name==='login'    ? '' : 'none';
+    $('register-form').style.display = name==='register' ? '' : 'none';
+    document.querySelectorAll('.auth-tab').forEach((el,i) =>
+      el.classList.toggle('active', (i===0&&name==='login')||(i===1&&name==='register')));
+  }
+
+  function setLoading(on) {
+    $('login-btn').disabled = on;
+    $('reg-btn').disabled   = on;
+  }
+  function setLoadingText(msg) { $('loading-txt').textContent = msg; }
+  function showAuthError(msg)  { $('auth-err').textContent = msg; $('auth-err').style.display = 'block'; }
+  function clearAuthError()    { $('auth-err').style.display = 'none'; }
+
+  async function doLogin(e) {
+    e.preventDefault(); clearAuthError(); setLoading(true);
+    await App.login($('lu').value.trim(), $('lp').value, $('lpp').value);
+    setLoading(false);
+  }
+  async function doRegister(e) {
+    e.preventDefault(); clearAuthError(); setLoading(true);
+    await App.register($('ru').value.trim(), $('re').value.trim(), $('rp').value, $('rpp').value);
+    setLoading(false);
+  }
+  async function doUnlock(e) {
+    e.preventDefault();
+    $('unlock-err').style.display = 'none';
+    try {
+      await App.unlock($('unlock-pp').value);
+    } catch(err) {
+      $('unlock-err').textContent = err.message;
+      $('unlock-err').style.display = 'block';
+    }
+  }
+  function forceLogout() { App.logout(); }
+
+  // ── Screen transitions ──
+  function showAuth()    { $('auth-screen').style.display='flex'; $('unlock-screen').style.display='none'; $('app').classList.remove('visible'); clearAuthError(); setLoadingText(''); }
+  function showUnlock()  { $('auth-screen').style.display='none'; $('unlock-screen').style.display='flex'; $('app').classList.remove('visible'); }
+  function showApp()     {
+    $('auth-screen').style.display='none'; $('unlock-screen').style.display='none'; $('app').classList.add('visible');
+    setLoadingText('');
+    const s = App.getState();
+    $('sb-name').textContent = s.displayName || s.username;
+    $('sb-av').textContent   = (s.displayName||s.username||'?')[0].toUpperCase();
+  }
+  function setStatus(st) { $('sb-status').textContent = st==='online' ? '● online' : '○ offline'; }
+
+  // ── Contacts ──
+  function renderContacts(list) {
+    const el = $('contacts-list');
+    if (!list.length) { el.innerHTML='<div style="padding:24px;text-align:center;color:var(--hint);font-size:13px">Chưa có liên hệ. Nhấn 👤+ để thêm.</div>'; return; }
+    el.innerHTML = list.map(c => `
+      <div class="contact-item" id="ci-${c.contactUserID}" onclick="App.openChat(${c.contactUserID})">
+        <div class="avatar" style="background:var(--pur-l);color:var(--pur)">${(c.displayName||c.username)[0].toUpperCase()}</div>
+        <div class="ci-info">
+          <div class="ci-name">${esc(c.displayName||c.username)}</div>
+          <div class="ci-sub">@${esc(c.username)}${c.status==='online'?' · <span style="color:var(--grn)">online</span>':''}</div>
+          ${c.keyMismatch?'<div class="key-warn">⚠ Public key đã thay đổi</div>':''}
+        </div>
+        <div class="unread" id="unread-${c.contactUserID}" style="display:none">0</div>
+      </div>`).join('');
+  }
+  function filterContacts(q) {
+    document.querySelectorAll('.contact-item').forEach(el => {
+      el.style.display = el.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+    });
+  }
+  function showUnread(cid) {
+    const el = $(`unread-${cid}`);
+    if (!el) return;
+    const n = parseInt(el.textContent||0)+1; el.textContent=n; el.style.display='block';
+  }
+
+  // ── Chat ──
+  function openChatPanel(contact) {
+    $('chat-empty').style.display = 'none';
+    const ca = $('chat-active'); ca.classList.add('open');
+    $('chat-av').textContent = (contact.username||'?')[0].toUpperCase();
+    $('chat-name').textContent = contact.username;
+    // Clear messages
+    const msgs = $('msgs');
+    [...msgs.children].forEach(c => { if (c.id!=='load-more'&&c.id!=='hist-load') c.remove(); });
+    document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
+    $(`ci-${contact.userID}`)?.classList.add('active');
+    $(`unread-${contact.userID}`)?.style.setProperty('display','none');
+  }
+
+  function addMessage(packet, plaintext, result, isSent=false) {
+    const msgs   = $('msgs');
+    const div    = document.createElement('div');
+    const isMine = packet.senderID===App.getState().userID || isSent;
+    div.className = `bubble ${isMine?'sent':'recv'}`;
+    const time = new Date(packet.timestamp||Date.now()).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+    const tamper  = result?.tamperAlert;
+    const content = tamper ? '⚠ Tin nhắn bị giả mạo hoặc toàn vẹn thất bại' : esc(plaintext||'–');
+    const badge   = tamper ? '<span class="tbadge">⚠ tamper</span>' : (!isSent && result?.isVerified ? '<span class="vbadge">✓</span>' : '');
+    div.innerHTML = `<div class="bubble-body${tamper?' tamper':''}">${content}</div><div class="bubble-meta"><span>${time}</span>${badge}</div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+  function renderHistoryMessage(msg, plaintext, result, isMine) { addMessage(msg, plaintext||(isMine?'[Tin của bạn]':null), result, isMine); }
+  function setHistoryLoading(on) { $('hist-load').style.display = on?'block':'none'; }
+  function showLoadMoreBtn(cid, page) { _loadMorePage=page; _loadMoreCID=cid; $('load-more').style.display='block'; }
+  function loadMore() { if (_loadMoreCID) App.loadHistory(_loadMoreCID, _loadMorePage); }
+
+  function msgKey(e) { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); send(); } }
+  function send()    { const inp=$('msg-inp'); const t=inp.value.trim(); if(!t) return; inp.value=''; inp.style.height=''; App.sendMessage(t); }
+  function msgInput(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; const c=App.getState().currentContact; if(c&&typeof socket!=='undefined'){socket.emit('typing',{toUserID:c.userID});clearTimeout(_typingTimer);_typingTimer=setTimeout(()=>socket.emit('stop_typing',{toUserID:c.userID}),2000);} }
+  function showTyping(fid) { const s=App.getState(); if(s.currentContact?.userID!==fid) return; const u=s.contacts.find(c=>c.contactUserID===fid)?.username||'ai đó'; $('typing-ind').textContent=`${u} đang nhập...`; }
+  function hideTyping(fid) { if(App.getState().currentContact?.userID!==fid) return; $('typing-ind').textContent=''; }
+
+  // ── Add-contact modal ──
+  let _addTab = 'search';
+  function openAddModal() {
+    $('add-modal').classList.add('open');
+    loadPendingRequests();
+    $('user-q').value=''; $('search-results').innerHTML='<p style="font-size:13px;color:var(--hint);padding:8px">Nhập ít nhất 2 ký tự để tìm...</p>';
+    switchAddTab(_addTab);
+  }
+  function closeAddModal() { $('add-modal').classList.remove('open'); }
+
+  function switchAddTab(tab) {
+    _addTab = tab;
+    $('add-tab-search').style.display = tab==='search' ? '' : 'none';
+    $('add-tab-reqs').style.display   = tab==='reqs'   ? '' : 'none';
+    $('tab-search').style.color = tab==='search'?'var(--cyan)':'var(--muted)';
+    $('tab-search').style.borderBottomColor = tab==='search'?'var(--cyan)':'transparent';
+    $('tab-reqs').style.color = tab==='reqs'?'var(--cyan)':'var(--muted)';
+    $('tab-reqs').style.borderBottomColor = tab==='reqs'?'var(--cyan)':'transparent';
+    if (tab==='reqs') loadPendingRequests();
+  }
+
+  function userSearch(q) {
+    clearTimeout(_searchTimer);
+    if (q.length<2) { $('search-results').innerHTML='<p style="font-size:13px;color:var(--hint);padding:8px">Nhập ít nhất 2 ký tự...</p>'; return; }
+    _searchTimer = setTimeout(async () => {
+      try {
+        const users = await App.searchUsers(q);
+        if (!users.length) { $('search-results').innerHTML='<p style="padding:10px;font-size:13px;color:var(--hint)">Không tìm thấy người dùng</p>'; return; }
+        $('search-results').innerHTML = users.map(u => {
+          let action = '';
+          if      (u.relation==='contact')          action = '<span class="sr-action contact-badge">✓ Đã kết bạn</span>';
+          else if (u.relation==='request_sent')      action = `<span class="sr-action"><button class="sent-btn" disabled>Đã gửi lời mời</button></span>`;
+          else if (u.relation==='request_received')  action = `<span class="sr-action"><button class="add-btn" onclick="ui.acceptByUser(${u.userID})">Chấp nhận</button></span>`;
+          else                                       action = `<span class="sr-action"><button class="add-btn" onclick="ui.sendRequest(${u.userID},'${esc(u.username)}')">Kết bạn</button></span>`;
+          return `<div class="sr-item">
+            <div class="avatar" style="background:var(--grn-l);color:var(--grn);width:32px;height:32px;font-size:12px">${u.username[0].toUpperCase()}</div>
+            <div class="sr-info"><div class="sr-name">${esc(u.username)}</div><div class="sr-sub">${u.status}</div></div>
+            ${action}
+          </div>`;
+        }).join('');
+      } catch(err) { $('search-results').innerHTML=`<p style="color:var(--red);padding:10px;font-size:13px">${err.message}</p>`; }
+    }, 300);
+  }
+
+  async function sendRequest(toUserID, username) {
+    try {
+      await App.sendContactRequest(toUserID);
+      toast(`Đã gửi lời mời kết bạn đến @${username}`, 'success');
+      userSearch($('user-q').value); // refresh
+    } catch(err) { toast(err.message, 'error'); }
+  }
+
+  async function loadPendingRequests() {
+    try {
+      const reqs = await App.getPendingRequests();
+      const badge = $('req-count-badge');
+      if (reqs.length) { badge.textContent=reqs.length; badge.style.display='inline'; } else { badge.style.display='none'; }
+      $('add-btn').classList.toggle('has-notif', reqs.length>0);
+
+      if (!reqs.length) { $('req-list').innerHTML='<p style="font-size:13px;color:var(--hint);padding:8px">Không có lời mời nào</p>'; return; }
+      $('req-list').innerHTML = reqs.map(r => `
+        <div class="req-item" id="req-${r.requestID}">
+          <div class="avatar" style="background:var(--pur-l);color:var(--pur);width:34px;height:34px;font-size:13px">${r.fromUsername[0].toUpperCase()}</div>
+          <div class="req-info">
+            <div class="req-name">${esc(r.fromDisplay||r.fromUsername)} <span style="font-weight:400;color:var(--muted)">@${esc(r.fromUsername)}</span></div>
+            <div class="req-time">${new Date(r.createdAt).toLocaleDateString('vi-VN')}</div>
+          </div>
+          <div class="req-actions">
+            <button class="req-acc" onclick="ui.acceptRequest(${r.requestID}, '${esc(r.fromUsername)}')">✓ Chấp nhận</button>
+            <button class="req-rej" onclick="ui.rejectRequest(${r.requestID})">✗</button>
+          </div>
+        </div>`).join('');
+    } catch {}
+  }
+
+  async function acceptRequest(requestID, username) {
+    try {
+      await App.acceptRequest(requestID);
+      toast(`Đã chấp nhận lời mời từ @${username}. Cả 2 đã kết bạn!`, 'success');
+      $(`req-${requestID}`)?.remove();
+      await App.loadContacts();
+      loadPendingRequests();
+    } catch(err) { toast(err.message, 'error'); }
+  }
+
+  async function acceptByUser(fromUserID) {
+    // Find the request from this user and accept
+    const reqs = await App.getPendingRequests();
+    const req  = reqs.find(r => r.fromUserID === fromUserID);
+    if (req) await acceptRequest(req.requestID, req.fromUsername);
+  }
+
+  async function rejectRequest(requestID) {
+    try {
+      await App.rejectRequest(requestID);
+      $(`req-${requestID}`)?.remove();
+      loadPendingRequests();
+    } catch(err) { toast(err.message, 'error'); }
+  }
+
+  // ── Key modal ──
+  async function openKeyModal() {
+    $('key-modal').classList.add('open');
+    try {
+      const s = App.getState();
+      const r = await fetch('/api/keys/me', { headers: { Authorization:`Bearer ${s.token}` } });
+      const d = await r.json();
+      $('key-info').innerHTML = `<b>Key ID:</b> ${d.keyID}<br><b>Thuật toán:</b> RSA-OAEP 2048-bit<br><b>Trạng thái:</b> <span style="color:var(--grn)">active</span><br><b>Tạo lúc:</b> ${new Date(d.createdAt).toLocaleString('vi-VN')}<br><b>Public Key:</b> <span style="font-size:10px;word-break:break-all">${(d.publicKey||'').slice(0,80)}...</span>`;
+    } catch {}
+  }
+  function closeKeyModal() { $('key-modal').classList.remove('open'); }
+  async function doRevokeKey() {
+    const pp = $('rev-pp').value;
+    const reason = $('rev-reason').value;
+    if (!pp) { toast('Nhập passphrase để xác nhận', 'warn'); return; }
+    try { await App.revokeAndRegenKey(pp, reason||'user_requested'); closeKeyModal(); }
+    catch(err) { toast('Lỗi: '+err.message, 'error'); }
+  }
+
+  // Public notification for socket events
+  function onContactRequest(data) {
+    loadPendingRequests();
+    toast(`${data.fromDisplay||data.fromUsername} muốn kết bạn với bạn`, 'warn');
+  }
+  function onContactAccepted(data) {
+    toast(`${data.byDisplay||data.byUsername} đã chấp nhận lời mời kết bạn!`, 'success');
+    App.loadContacts();
+  }
+
+  return {
+    tab, doLogin, doRegister, doUnlock, forceLogout,
+    setLoading, setLoadingText, showAuthError,
+    showAuth, showUnlock, showApp, setStatus,
+    renderContacts, filterContacts, showUnread,
+    openChatPanel, addMessage, renderHistoryMessage,
+    setHistoryLoading, showLoadMoreBtn, loadMore,
+    msgKey, send, msgInput, showTyping, hideTyping,
+    openAddModal, closeAddModal, switchAddTab,
+    userSearch, sendRequest, loadPendingRequests,
+    acceptRequest, acceptByUser, rejectRequest,
+    openKeyModal, closeKeyModal, doRevokeKey,
+    onContactRequest, onContactAccepted,
+    toast
+  };
+})();
+</script>
+</body>
+</html>
