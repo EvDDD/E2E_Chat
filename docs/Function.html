@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>E2EE Chat — Function Reference</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f8fafc; --surface: #fff; --border: #e2e8f0;
+    --txt: #0f172a; --muted: #334155; --hint: #475569;
+    --grn: #047857; --grn-l: #d1fae5; --grn-b: #6ee7b7;
+    --pur: #5b21b6; --pur-l: #ede9fe; --pur-b: #c4b5fd;
+    --cyn: #0369a1; --cyn-l: #e0f2fe; --cyn-b: #7dd3fc;
+    --amb: #92400e; --amb-l: #fef3c7; --amb-b: #fcd34d;
+    --red: #991b1b; --red-l: #fee2e2; --red-b: #fca5a5;
+    --ore: #b45309; --ore-l: #fff7ed; --ore-b: #fdba74;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--txt); font-family:'DM Sans',sans-serif;
+    font-size:14px; padding:32px 24px 64px; line-height:1.6; }
+
+  /* page header */
+  .pg-head { text-align:center; margin-bottom:48px; }
+  .pg-chip { display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:3px; text-transform:uppercase; color:var(--cyn);
+    border:1.5px solid var(--cyn); padding:3px 12px; border-radius:2px; margin-bottom:12px; }
+  .pg-title { font-size:clamp(20px,3vw,34px); font-weight:600; color:var(--txt); }
+  .pg-sub { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); margin-top:6px; }
+
+  /* module section */
+  .mod { margin-bottom:52px; }
+  .mod-hdr { display:flex; align-items:center; gap:10px; margin-bottom:20px; padding-bottom:10px;
+    border-bottom:1.5px solid var(--border); }
+  .mod-hdr::before { content:''; width:4px; height:22px; border-radius:2px;
+    background:currentColor; flex-shrink:0; }
+  .mod-hdr h2 { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600;
+    letter-spacing:.8px; text-transform:uppercase; }
+  .mod-tag { font-family:'JetBrains Mono',monospace; font-size:9px; padding:3px 9px;
+    border-radius:10px; letter-spacing:1.5px; }
+
+  .col-grn { color:var(--grn); }
+  .col-pur { color:var(--pur); }
+  .col-cyn { color:var(--cyn); }
+  .col-amb { color:var(--amb); }
+  .col-ore { color:var(--ore); }
+
+  .tag-grn { background:var(--grn-l); color:var(--grn); border:0.5px solid var(--grn-b); }
+  .tag-pur { background:var(--pur-l); color:var(--pur); border:0.5px solid var(--pur-b); }
+  .tag-cyn { background:var(--cyn-l); color:var(--cyn); border:0.5px solid var(--cyn-b); }
+  .tag-amb { background:var(--amb-l); color:var(--amb); border:0.5px solid var(--amb-b); }
+  .tag-ore { background:var(--ore-l); color:var(--ore); border:0.5px solid var(--ore-b); }
+  .tag-red { background:var(--red-l); color:var(--red); border:0.5px solid var(--red-b); }
+
+  /* function card */
+  .fn-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .fn-grid.single { grid-template-columns:1fr; }
+  @media(max-width:860px) { .fn-grid { grid-template-columns:1fr; } }
+  .fn-card { background:var(--surface); border:0.5px solid var(--border);
+    border-radius:12px; overflow:hidden; }
+
+  /* card header */
+  .fn-hd { padding:13px 16px 11px; border-bottom:0.5px solid var(--border); }
+  .fn-sig { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:500;
+    color:var(--txt); margin-bottom:3px; }
+  .fn-sig .fn { font-weight:600; }
+  .fn-sig .pm { font-weight:400; }
+  .fn-desc { font-size:13px; color:var(--muted); margin-top:5px; font-weight:500; }
+  .fn-badges { display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; }
+  .fn-badge { font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 8px;
+    border-radius:4px; letter-spacing:1px; }
+
+  /* IO */
+  .io-wrap { display:grid; grid-template-columns:1fr 1fr; border-bottom:0.5px solid var(--border); }
+  .io-blk { padding:11px 16px; }
+  .io-blk:first-child { border-right:0.5px solid var(--border); }
+  .io-lbl { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px;
+    text-transform:uppercase; color:#475569; margin-bottom:8px; font-weight:600; }
+  .io-row { margin-bottom:6px; }
+  .io-name { font-family:'JetBrains Mono',monospace; font-size:11.5px; font-weight:500; color:var(--txt); }
+  .io-type { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; color:var(--hint); margin-left:5px; }
+  .io-note { font-size:12px; color:var(--muted); margin-top:1px; padding-left:1px; }
+  .io-next { font-size:12px; margin-top:8px; font-style:italic; color:var(--muted); font-weight:500; }
+  .io-next b { font-style:normal; font-family:'JetBrains Mono',monospace; font-size:10.5px; }
+
+  /* steps */
+  .steps { padding:13px 16px; }
+  .steps-lbl { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px;
+    text-transform:uppercase; color:#475569; margin-bottom:10px; font-weight:600; }
+  .step { display:flex; gap:11px; margin-bottom:10px; align-items:flex-start; }
+  .step:last-child { margin-bottom:0; }
+  .sn { flex-shrink:0; width:20px; height:20px; border-radius:50%;
+    background:var(--bg); border:0.5px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; color:#334155; }
+  .sb { flex:1; }
+  .st { font-size:12.5px; font-weight:500; color:var(--txt); margin-bottom:2px; }
+  .sa { font-family:'JetBrains Mono',monospace; font-size:10.5px; display:inline-block;
+    padding:2px 7px; border-radius:0; margin-bottom:3px; }
+  .sd { font-size:12px; color:var(--muted); line-height:1.55; }
+
+  /* security note */
+  .sec-note { margin-top:10px; padding:10px 14px;
+    background:#fefce8; border:1px solid #fbbf24; border-left:3px solid #d97706;
+    border-radius:0 6px 6px 0; font-size:11px; color:#78350f; line-height:1.7; }
+  .sec-note b { color:#92400e; }
+
+  /* call flow strip */
+  .flow-strip { background:var(--surface); border:0.5px solid var(--border);
+    border-radius:10px; padding:16px 18px; margin-bottom:16px; }
+  .flow-strip-lbl { font-family:'JetBrains Mono',monospace; font-size:9px;
+    letter-spacing:2px; text-transform:uppercase; color:#475569; margin-bottom:12px; font-weight:600; }
+  .flow-row { display:flex; align-items:center; flex-wrap:wrap; gap:0; }
+  .flow-fn { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500;
+    padding:6px 11px; border-radius:6px; white-space:nowrap; }
+  .flow-arr { display:flex; flex-direction:column; align-items:center; padding:0 6px; min-width:44px; }
+  .flow-arr svg { flex-shrink:0; }
+  .flow-arr span { font-family:'JetBrains Mono',monospace; font-size:9px;
+    color:var(--muted); text-align:center; margin-top:2px; max-width:80px; line-height:1.35; }
+  .sub-flow { margin:8px 0 0 14px; padding:8px 12px;
+    border-left:3px solid var(--border); border-radius:0 6px 6px 0;
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:#334155; line-height:1.7; }
+  .sub-flow b { color:var(--txt); }
+
+  @media print {
+    @page { size: A4 portrait; margin: 13mm 12mm 13mm 12mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    body {
+      background: #fff !important;
+      padding: 0 !important;
+      font-size: 11px;
+    }
+
+    /* ── Page 1: header + call flow overview ── */
+    .pg-head { padding: 8mm 0 4mm; page-break-after: avoid; }
+    .pg-title { font-size: 22px !important; }
+    .pg-sub   { font-size: 10px !important; }
+
+    /* Call flow strips pack tightly, no breaks inside */
+    .flow-strip { page-break-inside: avoid; break-inside: avoid;
+      margin-bottom: 8pt !important; padding: 10px 12px !important; }
+    .flow-strip-lbl { font-size: 9px !important; margin-bottom: 8pt !important; }
+    .flow-fn  { font-size: 10px !important; padding: 5px 9px !important; }
+    .flow-arr { min-width: 34px !important; padding: 0 3px !important; }
+    .flow-arr span { font-size: 8px !important; }
+    .sub-flow { font-size: 9.5px !important; padding: 5px 9px !important; margin-top: 5pt !important; }
+
+    /* After overview, break before Module 1 */
+    .mod:nth-of-type(2) { page-break-before: always; }
+
+    /* ── Modules: let content flow — NO forced break per module ──
+       Only break when a module's header would be orphaned */
+    .mod { page-break-before: auto; margin-bottom: 8pt !important; }
+    .mod-hdr { page-break-after: avoid; margin-bottom: 10pt !important;
+      padding-bottom: 6pt !important; }
+
+    /* ── Grid: single column for A4 width ── */
+    .fn-grid { grid-template-columns: 1fr !important; gap: 10pt !important; }
+    .fn-grid.single { grid-template-columns: 1fr !important; }
+
+    /* ── Each fn-card: avoid breaking inside small/medium cards ── */
+    .fn-card {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      margin-bottom: 10pt !important;
+    }
+
+    /* Large core cards (encryptMessage, decryptMessage, loadHistory)
+       are ~200px tall — allow breaking but keep header+IO together */
+    .fn-card.full { page-break-inside: auto; break-inside: auto; }
+    .fn-card.full .fn-hd { page-break-after: avoid; }
+    .fn-card.full .io-wrap { page-break-inside: avoid; break-inside: avoid; page-break-after: avoid; }
+
+    /* ── Compact component sizes for print ── */
+    .fn-hd   { padding: 8px 12px 7px !important; }
+    .fn-sig  { font-size: 11.5px !important; }
+    .fn-desc { font-size: 11px !important; }
+    .fn-badges { margin-top: 5px !important; gap: 4px !important; }
+    .fn-badge  { font-size: 8px !important; padding: 1px 6px !important; }
+
+    .io-wrap { display: grid; grid-template-columns: 1fr 1fr !important; }
+    .io-blk  { padding: 8px 12px !important; }
+    .io-lbl  { font-size: 8px !important; margin-bottom: 6px !important; }
+    .io-row  { margin-bottom: 4px !important; }
+    .io-name { font-size: 10.5px !important; }
+    .io-type { font-size: 9.5px !important; }
+    .io-note { font-size: 10px !important; }
+    .io-next { font-size: 10px !important; margin-top: 5px !important; }
+
+    .steps      { padding: 9px 12px !important; }
+    .steps-lbl  { font-size: 8px !important; margin-bottom: 7px !important; }
+    .step       { margin-bottom: 7px !important; gap: 9px !important; }
+    .sn  { width: 17px !important; height: 17px !important; font-size: 9px !important; flex-shrink: 0; }
+    .st  { font-size: 11px !important; margin-bottom: 1px !important; }
+    .sa  { font-size: 9.5px !important; padding: 1px 6px !important; margin-bottom: 2px !important; }
+    .sd  { font-size: 10px !important; line-height: 1.5 !important; }
+
+    .mod-hdr h2   { font-size: 11px !important; }
+    .mod-tag      { font-size: 8px !important; padding: 2px 7px !important; }
+    .sec-note     { page-break-inside: avoid; font-size: 10px !important; padding: 8px 11px !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="pg-head">
+  <div class="pg-chip">Đồ Án · Mai Đức Duy · 22127084</div>
+  <div class="pg-title">E2EE Chat</div>
+</div>
+
+<!-- ════════════════ CALL FLOW OVERVIEW ════════════════ -->
+<div class="mod">
+  <div class="mod-hdr" style="color:#475569;">
+    <h2>Call Flow — Quan hệ giao tiếp giữa các hàm <span class="mod-tag" style="background:#f1f5f9;color:#475569;border-color:#e2e8f0;">OVERVIEW</span></h2>
+  </div>
+
+  <!-- Registration -->
+  <div class="flow-strip">
+    <div class="flow-strip-lbl">① Registration</div>
+    <div class="flow-row">
+      <div class="flow-fn" style="background:var(--grn-l);color:var(--grn);border:0.5px solid var(--grn-b);">register()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a1" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#047857"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#047857" stroke-width="1.5" marker-end="url(#a1)"/></svg><span>triggers</span></div>
+      <div class="flow-fn" style="background:var(--pur-l);color:var(--pur);border:0.5px solid var(--pur-b);">generateKeyPair()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a2" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#5b21b6"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#5b21b6" stroke-width="1.5" marker-end="url(#a2)"/></svg><span>pubKey, encPrivKey</span></div>
+      <div class="flow-fn" style="background:var(--pur-l);color:var(--pur);border:0.5px solid var(--pur-b);">storeKeyPair()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a2b" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#5b21b6"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#5b21b6" stroke-width="1.5" marker-end="url(#a2b)"/></svg><span>→ Key Store</span></div>
+      <div class="flow-fn" style="background:#f1f5f9;color:#475569;border:0.5px solid #e2e8f0;">JWT + session</div>
+    </div>
+  </div>
+
+  <!-- Login -->
+  <div class="flow-strip">
+    <div class="flow-strip-lbl">② Login</div>
+    <div class="flow-row">
+      <div class="flow-fn" style="background:var(--grn-l);color:var(--grn);border:0.5px solid var(--grn-b);">login()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a3" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#047857"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#047857" stroke-width="1.5" marker-end="url(#a3)"/></svg><span>JWT + encPrivKey</span></div>
+      <div class="flow-fn" style="background:var(--pur-l);color:var(--pur);border:0.5px solid var(--pur-b);">decryptPrivateKey()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a4" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#5b21b6"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#5b21b6" stroke-width="1.5" marker-end="url(#a4)"/></svg><span>PrivKey in memory</span></div>
+      <div class="flow-fn" style="background:#f1f5f9;color:#475569;border:0.5px solid #e2e8f0;">session ready</div>
+    </div>
+  </div>
+
+  <!-- Send -->
+  <div class="flow-strip">
+    <div class="flow-strip-lbl">③ Send message</div>
+    <div class="flow-row">
+      <div class="flow-fn" style="background:var(--pur-l);color:var(--pur);border:0.5px solid var(--pur-b);">getPublicKey()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a5" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#0369a1"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#0369a1" stroke-width="1.5" marker-end="url(#a5)"/></svg><span>PubKey_B</span></div>
+      <div class="flow-fn" style="background:var(--cyn-l);color:var(--cyn);border:0.5px solid var(--cyn-b);">encryptMessage()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a6" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#0369a1"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#0369a1" stroke-width="1.5" marker-end="url(#a6)"/></svg><span>{C,K',S,H,IV}</span></div>
+      <div class="flow-fn" style="background:var(--amb-l);color:var(--amb);border:0.5px solid var(--amb-b);">sendPacket()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a6b" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#92400e"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#92400e" stroke-width="1.5" marker-end="url(#a6b)"/></svg><span>→ Socket + Message Store</span></div>
+      <div class="flow-fn" style="background:#f1f5f9;color:#475569;border:0.5px solid #e2e8f0;">delivered</div>
+    </div>
+    <div class="sub-flow"><b>encryptMessage()</b> gọi tuần tự → <b>hashPlaintext()</b> → <b>encryptAES()</b> → <b>encryptRSA()</b> → <b>signHash()</b></div>
+  </div>
+
+  <!-- Receive -->
+  <div class="flow-strip">
+    <div class="flow-strip-lbl">④ Receive message</div>
+    <div class="flow-row">
+      <div class="flow-fn" style="background:var(--amb-l);color:var(--amb);border:0.5px solid var(--amb-b);">receivePacket()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a7" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#047857"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#047857" stroke-width="1.5" marker-end="url(#a7)"/></svg><span>validated packet</span></div>
+      <div class="flow-fn" style="background:var(--grn-l);color:var(--grn);border:0.5px solid var(--grn-b);">decryptMessage()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a8" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#047857"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#047857" stroke-width="1.5" marker-end="url(#a8)"/></svg><span>plaintext + verified</span></div>
+      <div class="flow-fn" style="background:#f1f5f9;color:#475569;border:0.5px solid #e2e8f0;">render / alert</div>
+    </div>
+    <div class="sub-flow"><b>decryptMessage()</b> gọi tuần tự → <b>decryptRSA()</b> → <b>decryptAES()</b> → <b>hashPlaintext()</b> → <b>verifySignature()</b></div>
+  </div>
+
+  <!-- History -->
+  <div class="flow-strip">
+    <div class="flow-strip-lbl">⑤ Load history</div>
+    <div class="flow-row">
+      <div class="flow-fn" style="background:var(--pur-l);color:var(--pur);border:0.5px solid var(--pur-b);">loadHistory()</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a9" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#5b21b6"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#5b21b6" stroke-width="1.5" marker-end="url(#a9)"/></svg><span>packets from Message Store</span></div>
+      <div class="flow-fn" style="background:var(--grn-l);color:var(--grn);border:0.5px solid var(--grn-b);">decryptMessage() ×N</div>
+      <div class="flow-arr"><svg width="38" height="14"><defs><marker id="a10" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L0,6L6,3z" fill="#5b21b6"/></marker></defs><line x1="2" y1="7" x2="32" y2="7" stroke="#5b21b6" stroke-width="1.5" marker-end="url(#a10)"/></svg><span>messages[]</span></div>
+      <div class="flow-fn" style="background:#f1f5f9;color:#475569;border:0.5px solid #e2e8f0;">render history</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ MODULE 1: AUTH ════════════════ -->
+<div class="mod">
+  <div class="mod-hdr col-grn">
+    <h2>Module 1 — User Authentication <span class="mod-tag tag-grn">AUTH · P1 · SERVER</span></h2>
+  </div>
+  <div class="fn-grid">
+
+    <!-- register() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-grn">register</span>(<span class="pm">username, email, password</span>)</div>
+        <div class="fn-desc">Tạo tài khoản mới, hash mật khẩu, trả JWT và trigger sinh khóa RSA</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-grn">P1</span>
+          <span class="fn-badge tag-amb">SERVER-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">username</span><span class="io-type">string</span><div class="io-note">Tên đăng nhập, UNIQUE trong DB</div></div>
+          <div class="io-row"><span class="io-name">email</span><span class="io-type">string</span><div class="io-note">Email, UNIQUE trong DB</div></div>
+          <div class="io-row"><span class="io-name">password</span><span class="io-type">string</span><div class="io-note">Mật khẩu gốc — plaintext từ client</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">userID</span><span class="io-type">int</span><div class="io-note">ID vừa tạo trong users table</div></div>
+          <div class="io-row"><span class="io-name">sessionToken</span><span class="io-type">string</span><div class="io-note">JWT signed, exp 24h</div></div>
+          <div class="io-next">→ triggers <b>generateKeyPair(userID)</b></div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">Validate</div><div class="sd">Kiểm tra username và email chưa tồn tại trong DB. Nếu trùng → throw error ngay.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">Hash mật khẩu</div><div class="sa" style="background:var(--grn-l);color:var(--grn);">bcrypt.hash(password, rounds=12)</div><div class="sd">bcrypt tự sinh và nhúng salt 128-bit vào hash string — không cần lưu salt riêng.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">Insert vào DB</div><div class="sd">Lưu user record vào <code>users</code> table với <code>isVerified=false</code>, <code>status=offline</code>.</div></div></div>
+        <div class="step"><div class="sn">4</div><div class="sb"><div class="st">Trigger sinh khóa RSA</div><div class="sd">Gọi async <b>generateKeyPair(userID)</b> — chạy ở client sau khi nhận response.</div></div></div>
+        <div class="step"><div class="sn">5</div><div class="sb"><div class="st">Phát JWT</div><div class="sa" style="background:var(--grn-l);color:var(--grn);">JWT.sign({ userID, exp: 24h })</div></div></div>
+      </div>
+    </div>
+
+    <!-- login() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-grn">login</span>(<span class="pm">username, password</span>)</div>
+        <div class="fn-desc">Xác thực mật khẩu, trả JWT và encrypted PrivKey về client</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-grn">P1</span>
+          <span class="fn-badge tag-amb">SERVER-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">username</span><span class="io-type">string</span></div>
+          <div class="io-row"><span class="io-name">password</span><span class="io-type">string</span><div class="io-note">Plaintext từ client</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">sessionToken</span><span class="io-type">string (JWT)</span></div>
+          <div class="io-row"><span class="io-name">encPrivKey</span><span class="io-type">string</span><div class="io-note">PrivKey đã AES-encrypt — server không đọc được</div></div>
+          <div class="io-next">→ encPrivKey vào <b>decryptPrivateKey()</b> ở client</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">Lookup user</div><div class="sd">Tìm user theo username. Không tìm thấy → throw <code>USER_NOT_FOUND</code>.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">Verify mật khẩu</div><div class="sa" style="background:var(--grn-l);color:var(--grn);">bcrypt.verify(password, user.passwordHash)</div><div class="sd">bcrypt tự extract salt từ hash string để verify — không cần trường salt riêng.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">Lấy encrypted PrivKey từ Key Store</div><div class="sd">Fetch <code>key_pairs WHERE userID=X AND status='active'</code>. Trả về <code>privateKey</code> — vẫn còn AES-encrypted, server không bao giờ giải mã.</div></div></div>
+        <div class="step"><div class="sn">4</div><div class="sb"><div class="st">Update trạng thái</div><div class="sd">Set <code>status='online'</code>, <code>lastSeen=NOW()</code> trong users table.</div></div></div>
+        <div class="step"><div class="sn">5</div><div class="sb"><div class="st">Phát JWT + trả về</div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════ MODULE 2: KEY MANAGEMENT ════════════════ -->
+<div class="mod">
+  <div class="mod-hdr col-pur">
+    <h2>Module 2 — Key Management <span class="mod-tag tag-pur">KEY MGMT · P2 · P3</span></h2>
+  </div>
+  <div class="fn-grid">
+
+    <!-- generateKeyPair() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-pur">generateKeyPair</span>(<span class="pm">userID, passphrase</span>)</div>
+        <div class="fn-desc">Sinh cặp khóa RSA-2048, mã hóa PrivKey bằng passphrase — chạy hoàn toàn ở client</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-pur">P2</span>
+          <span class="fn-badge tag-cyn">CLIENT-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">userID</span><span class="io-type">int</span></div>
+          <div class="io-row"><span class="io-name">passphrase</span><span class="io-type">string</span><div class="io-note">Nhập bởi user, dùng để bảo vệ PrivKey</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">pubKeyB64</span><span class="io-type">string (Base64)</span><div class="io-note">SPKI format — chia sẻ công khai được</div></div>
+          <div class="io-row"><span class="io-name">encPrivKey</span><span class="io-type">string</span><div class="io-note">PrivKey đã AES-GCM encrypt</div></div>
+          <div class="io-next">→ cả 2 vào <b>storeKeyPair()</b></div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">Sinh cặp khóa RSA</div><div class="sa" style="background:var(--pur-l);color:var(--pur);">WebCrypto.generateKey — RSA-OAEP, 2048-bit, e=65537</div><div class="sd">Chạy trong browser sandbox, khóa chưa bao giờ ra khỏi client ở dạng plaintext.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">Export Public Key</div><div class="sa" style="background:var(--pur-l);color:var(--pur);">exportKey("spki") → Base64</div><div class="sd">SPKI là format chuẩn cho public key, an toàn để gửi lên server.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">Derive AES key từ passphrase</div><div class="sa" style="background:var(--pur-l);color:var(--pur);">PBKDF2(passphrase, salt=random16, iter=100000, SHA-256)</div><div class="sd">100,000 iterations để chống brute-force. Salt ngẫu nhiên đảm bảo cùng passphrase → AES key khác nhau.</div></div></div>
+        <div class="step"><div class="sn">4</div><div class="sb"><div class="st">Mã hóa Private Key</div><div class="sa" style="background:var(--pur-l);color:var(--pur);">AES-256-GCM(aesKey, IV=random12, privKeyBytes)</div><div class="sd">GCM cung cấp auth tag — phát hiện ngay nếu ciphertext bị tamper khi giải mã. IV ngẫu nhiên 12 byte.</div></div></div>
+        <div class="step"><div class="sn">5</div><div class="sb"><div class="st">Upload lên server</div><div class="sd">Gọi <b>storeKeyPair()</b>. Server chỉ lưu bản đã encrypt, không thể đọc được nội dung khóa.</div></div></div>
+      </div>
+    </div>
+
+    <!-- decryptPrivateKey() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-pur">decryptPrivateKey</span>(<span class="pm">encPrivKey, passphrase</span>)</div>
+        <div class="fn-desc">Giải mã PrivKey từ server bằng passphrase — chạy ở client sau login</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-pur">P2</span>
+          <span class="fn-badge tag-cyn">CLIENT-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">encPrivKey</span><span class="io-type">string</span><div class="io-note">Nhận từ output của <b>login()</b></div></div>
+          <div class="io-row"><span class="io-name">passphrase</span><span class="io-type">string</span><div class="io-note">User nhập — dùng để re-derive AES key</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">privateKey</span><span class="io-type">CryptoKey</span><div class="io-note">Nằm trong memory, không serialize, không gửi đi</div></div>
+          <div class="io-next">→ vào <b>encryptMessage()</b> (ký) và <b>decryptMessage()</b> (giải mã)</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">Parse encPrivKey</div><div class="sd">Tách ra: <code>{ salt, IV, ciphertext, authTag }</code> từ chuỗi Base64 đã lưu.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">Re-derive AES key</div><div class="sa" style="background:var(--pur-l);color:var(--pur);">PBKDF2(passphrase, salt, iter=100000)</div><div class="sd">Dùng đúng salt đã lưu → ra đúng AES key đã dùng lúc generateKeyPair.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">Giải mã PrivKey</div><div class="sa" style="background:var(--pur-l);color:var(--pur);">AES-256-GCM.decrypt(aesKey, IV, ciphertext)</div><div class="sd">GCM tự xác thực authTag — nếu passphrase sai hoặc data bị tamper → throw error ngay, không giải mã ra gì.</div></div></div>
+        <div class="step"><div class="sn">4</div><div class="sb"><div class="st">Import dưới dạng CryptoKey</div><div class="sa" style="background:var(--pur-l);color:var(--pur);">importKey("pkcs8", extractable=false)</div><div class="sd"><code>extractable=false</code> nghĩa là key này không thể export ra bytes — chỉ dùng để sign/decrypt.</div></div></div>
+      </div>
+    </div>
+
+    <!-- storeKeyPair() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-pur">storeKeyPair</span>(<span class="pm">userID, pubKey, encPrivKey</span>)</div>
+        <div class="fn-desc">Lưu cặp khóa lên server (Key Store) — server chỉ lưu, không giải mã được PrivKey</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-pur">P2</span>
+          <span class="fn-badge tag-amb">SERVER-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">userID</span><span class="io-type">int</span></div>
+          <div class="io-row"><span class="io-name">pubKey</span><span class="io-type">string (Base64)</span><div class="io-note">Public key — plaintext, an toàn để lưu</div></div>
+          <div class="io-row"><span class="io-name">encPrivKey</span><span class="io-type">string</span><div class="io-note">Private key đã AES-encrypt</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">keyID</span><span class="io-type">int</span><div class="io-note">ID của row trong key_pairs table</div></div>
+          <div class="io-row"><span class="io-name">status</span><span class="io-type">"stored"</span></div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">Verify JWT</div><div class="sd">Đảm bảo chỉ chính user đó mới upload key của mình — không ai upload thay được.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">Insert key_pairs</div><div class="sd">Lưu với <code>status='active'</code>, <code>keySize=2048</code>, <code>algorithm='RSA-OAEP'</code>, <code>createdAt=NOW()</code>.</div></div></div>
+      </div>
+    </div>
+
+    <!-- getPublicKey() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-pur">getPublicKey</span>(<span class="pm">targetUserID</span>)</div>
+        <div class="fn-desc">Lấy Public Key của người nhận — kiểm tra cache và phát hiện key thay đổi đột ngột</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-pur">P2 / P3</span>
+          <span class="fn-badge tag-cyn">CLIENT-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">targetUserID</span><span class="io-type">int</span></div>
+          <div class="io-row"><span class="io-name">sessionToken</span><span class="io-type">string (JWT)</span></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">pubKey</span><span class="io-type">CryptoKey</span><div class="io-note">Sẵn sàng dùng để RSA-OAEP encrypt</div></div>
+          <div class="io-next">→ vào <b>encryptMessage()</b> làm receiverPubKey</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">Đọc cache từ contacts (Contact Store)</div><div class="sd">Lấy <code>cachedPubKey</code> và <code>cachedKeyID</code> của targetUserID trong contacts table.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">Fetch key hiện tại từ server (Key Store)</div><div class="sd">Gọi API lấy <code>key_pairs WHERE userID=X AND status='active'</code>.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">So sánh cache vs current</div><div class="sa" style="background:#fee2e2;color:#991b1b;">if cachedKeyID ≠ active keyID → ALERT</div><div class="sd">Key thay đổi đột ngột = dấu hiệu MITM. Cảnh báo user xác minh danh tính trước khi tiếp tục.</div></div></div>
+        <div class="step"><div class="sn">4</div><div class="sb"><div class="st">Cập nhật cache và import</div><div class="sd">Lưu key mới vào contacts.cachedPubKey và cachedKeyID. Import Base64 → CryptoKey để dùng.</div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════ MODULE 3: ENCRYPTION ════════════════ -->
+<div class="mod">
+  <div class="mod-hdr col-cyn">
+    <h2>Module 3 — Encryption Pipeline <span class="mod-tag tag-cyn">ENCRYPT &amp; SIGN · P4 · CLIENT</span></h2>
+  </div>
+
+  <!-- encryptMessage() — full width -->
+  <div class="fn-grid single" style="margin-bottom:16px;">
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-cyn">encryptMessage</span>(<span class="pm">plaintext, receiverPubKey, senderPrivKey</span>)</div>
+        <div class="fn-desc">Hàm tổng hợp pipeline mã hóa — gọi 4 hàm con bên dưới theo thứ tự, trả về packet hoàn chỉnh</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-cyn">P4 · CORE</span>
+          <span class="fn-badge tag-cyn">CLIENT-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">plaintext</span><span class="io-type">string</span><div class="io-note">Nội dung tin nhắn gốc M</div></div>
+          <div class="io-row"><span class="io-name">receiverPubKey</span><span class="io-type">CryptoKey</span><div class="io-note">Từ <b>getPublicKey()</b></div></div>
+          <div class="io-row"><span class="io-name">senderPrivKey</span><span class="io-type">CryptoKey</span><div class="io-note">Từ <b>decryptPrivateKey()</b>, trong memory</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output — packet gửi đi</div>
+          <div class="io-row"><span class="io-name">C</span><span class="io-type">string (Base64)</span><div class="io-note">Ciphertext — AES-256-CBC(M)</div></div>
+          <div class="io-row"><span class="io-name">K'</span><span class="io-type">string (Base64)</span><div class="io-note">RSA-OAEP(K) — session key đã mã hóa</div></div>
+          <div class="io-row"><span class="io-name">S</span><span class="io-type">string (Base64)</span><div class="io-note">RSA-PSS signature của H</div></div>
+          <div class="io-row"><span class="io-name">H</span><span class="io-type">string (hex)</span><div class="io-note">SHA-256(M)</div></div>
+          <div class="io-row"><span class="io-name">IV</span><span class="io-type">string (Base64)</span><div class="io-note">AES IV — 16 bytes ngẫu nhiên</div></div>
+          <div class="io-next">→ toàn bộ packet vào <b>sendPacket()</b></div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý — gọi tuần tự 4 hàm con</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">H = hashPlaintext(plaintext)</div><div class="sd">Tính hash trước khi mã hóa để H phản ánh đúng M gốc.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">K = random 256-bit · IV = random 16-byte</div><div class="sd">Session key và IV mới cho mỗi tin nhắn — perfect forward secrecy.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">C = encryptAES(plaintext, K, IV)</div></div></div>
+        <div class="step"><div class="sn">4</div><div class="sb"><div class="st">K' = encryptRSA(K, receiverPubKey)</div></div></div>
+        <div class="step"><div class="sn">5</div><div class="sb"><div class="st">S = signHash(H, senderPrivKey)</div></div></div>
+        <div class="step"><div class="sn">6</div><div class="sb"><div class="st">Assemble packet</div><div class="sd">Return <code>{ C, K', S, H, IV }</code></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fn-grid">
+
+    <!-- hashPlaintext() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-cyn">hashPlaintext</span>(<span class="pm">plaintext</span>)</div>
+        <div class="fn-desc">Tính SHA-256 của tin nhắn gốc — đảm bảo Integrity</div>
+        <div class="fn-badges"><span class="fn-badge tag-cyn">P4 · P6</span></div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">plaintext</span><span class="io-type">string</span><div class="io-note">Tin nhắn gốc M</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">H</span><span class="io-type">string (hex 64 ký tự)</span></div>
+          <div class="io-next">→ vào <b>signHash()</b> và lưu vào packet</div>
+          <div class="io-next">→ tái sử dụng trong <b>decryptMessage()</b> để verify</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="sa" style="background:var(--cyn-l);color:var(--cyn);">SHA-256(encode(plaintext)) → hashBytes</div><div class="sd">Dùng WebCrypto <code>crypto.subtle.digest("SHA-256")</code>.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="sd">Encode hashBytes → hex string 64 ký tự.</div></div></div>
+      </div>
+    </div>
+
+    <!-- encryptAES() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-cyn">encryptAES</span>(<span class="pm">plaintext, K, IV</span>)</div>
+        <div class="fn-desc">Mã hóa nội dung bằng AES-256-CBC — Confidentiality của M</div>
+        <div class="fn-badges"><span class="fn-badge tag-cyn">P4</span></div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">plaintext</span><span class="io-type">string</span></div>
+          <div class="io-row"><span class="io-name">K</span><span class="io-type">CryptoKey (256-bit)</span><div class="io-note">Session key ngẫu nhiên</div></div>
+          <div class="io-row"><span class="io-name">IV</span><span class="io-type">Uint8Array (16 bytes)</span><div class="io-note">Initialization vector ngẫu nhiên</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">C</span><span class="io-type">string (Base64)</span></div>
+          <div class="io-next">→ vào packet.C</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="sa" style="background:var(--cyn-l);color:var(--cyn);">AES-256-CBC.encrypt(K, IV, msgBytes)</div><div class="sd">Padding PKCS#7 tự động. Dùng AES vì nhanh hơn RSA nhiều với dữ liệu dài.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="sd">Encode cipherBuffer → Base64 string.</div></div></div>
+      </div>
+    </div>
+
+    <!-- encryptRSA() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-cyn">encryptRSA</span>(<span class="pm">K, receiverPubKey</span>)</div>
+        <div class="fn-desc">Mã hóa session key K bằng RSA-OAEP — chỉ receiver giải mã được K</div>
+        <div class="fn-badges"><span class="fn-badge tag-cyn">P4</span></div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">K</span><span class="io-type">CryptoKey</span><div class="io-note">AES session key 256-bit</div></div>
+          <div class="io-row"><span class="io-name">receiverPubKey</span><span class="io-type">CryptoKey</span><div class="io-note">Public Key của người nhận</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">K'</span><span class="io-type">string (Base64)</span><div class="io-note">K đã mã hóa — chỉ PrivKey_B giải được</div></div>
+          <div class="io-next">→ vào packet.K_enc</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="sd">Export K dưới dạng raw bytes.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="sa" style="background:var(--cyn-l);color:var(--cyn);">RSA-OAEP.encrypt(receiverPubKey, rawKey)</div><div class="sd">OAEP có padding ngẫu nhiên — cùng K → ciphertext khác nhau mỗi lần.</div></div></div>
+      </div>
+    </div>
+
+    <!-- signHash() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-cyn">signHash</span>(<span class="pm">H, senderPrivKey</span>)</div>
+        <div class="fn-desc">Ký số hash bằng RSA-PSS — Authentication + Non-repudiation</div>
+        <div class="fn-badges"><span class="fn-badge tag-cyn">P4</span></div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">H</span><span class="io-type">string (hex)</span><div class="io-note">SHA-256 của plaintext M</div></div>
+          <div class="io-row"><span class="io-name">senderPrivKey</span><span class="io-type">CryptoKey</span><div class="io-note">Private Key của người gửi</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">S</span><span class="io-type">string (Base64)</span><div class="io-note">Chữ ký RSA-PSS</div></div>
+          <div class="io-next">→ vào packet.S · lưu vĩnh viễn trong messages table cùng senderKeyID</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="sa" style="background:var(--cyn-l);color:var(--cyn);">RSA-PSS.sign(senderPrivKey, hashBytes, saltLen=32)</div><div class="sd">PSS có salt ngẫu nhiên — cùng H và key → signature khác nhau mỗi lần (khác PKCS1v1.5).</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="sd">Encode → Base64 string.</div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════ MODULE 4: TRANSMIT ════════════════ -->
+<div class="mod">
+  <div class="mod-hdr col-amb">
+    <h2>Module 4 — Transmit <span class="mod-tag tag-amb">NETWORK · P5</span></h2>
+  </div>
+  <div class="fn-grid">
+
+    <!-- sendPacket() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-amb">sendPacket</span>(<span class="pm">packet, receiverID, token</span>)</div>
+        <div class="fn-desc">Lưu packet vào Message Store, deliver qua Socket nếu receiver online</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-amb">P5</span>
+          <span class="fn-badge tag-amb">SERVER-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">packet</span><span class="io-type">object</span><div class="io-note">{C, K', S, H, IV} từ <b>encryptMessage()</b></div></div>
+          <div class="io-row"><span class="io-name">receiverID</span><span class="io-type">int</span></div>
+          <div class="io-row"><span class="io-name">token</span><span class="io-type">string (JWT)</span><div class="io-note">Để verify senderID</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">messageID</span><span class="io-type">int</span><div class="io-note">ID trong messages table</div></div>
+          <div class="io-row"><span class="io-name">status</span><span class="io-type">"sent" | "delivered"</span></div>
+          <div class="io-next">→ packet đến receiver qua Socket event <b>"new_message"</b></div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">Verify JWT</div><div class="sd">Extract senderID từ token. Không ai gửi thay được.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">Insert vào Message Store (messages table)</div><div class="sd">Lưu toàn bộ <code>{C, K', S, H, IV}</code> cùng <code>senderKeyID</code>, <code>receiverKeyID</code>, <code>status='sent'</code>. Server không đọc được nội dung.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">Deliver qua Socket</div><div class="sd">Nếu receiver đang online → emit <code>"new_message"</code> event, update <code>status='delivered'</code>. Nếu offline → message chờ trong Message Store cho đến khi receiver fetch.</div></div></div>
+      </div>
+    </div>
+
+    <!-- receivePacket() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-amb">receivePacket</span>(<span class="pm">socketEvent</span>)</div>
+        <div class="fn-desc">Nhận Socket event, validate cấu trúc packet, chuyển sang pipeline giải mã</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-amb">P5</span>
+          <span class="fn-badge tag-cyn">CLIENT-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">socketEvent</span><span class="io-type">Socket event</span><div class="io-note">"new_message" từ server</div></div>
+          <div class="io-row"><span class="io-name">&nbsp;↳ packet</span><span class="io-type">{C, K', S, H, IV}</span></div>
+          <div class="io-row"><span class="io-name">&nbsp;↳ senderID</span><span class="io-type">int</span></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">packet</span><span class="io-type">object (validated)</span></div>
+          <div class="io-next">→ vào <b>decryptMessage()</b></div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">Structural validation</div><div class="sd">Assert đủ các field: <code>C, K_enc, S, H, IV</code> đều có và không rỗng.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">ACK về server</div><div class="sd">Emit <code>"ack"</code> với messageID → server update <code>status='delivered'</code>.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">Lấy Public Key của sender</div><div class="sd">Gọi <b>getPublicKey(senderID)</b> để dùng verify signature.</div></div></div>
+        <div class="step"><div class="sn">4</div><div class="sb"><div class="st">Chuyển sang decryptMessage()</div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════ MODULE 5: DECRYPTION ════════════════ -->
+<div class="mod">
+  <div class="mod-hdr col-grn">
+    <h2>Module 5 — Decryption Pipeline <span class="mod-tag tag-grn">DECRYPT &amp; VERIFY · P6 · CLIENT</span></h2>
+  </div>
+
+  <!-- decryptMessage() — full width -->
+  <div class="fn-grid single" style="margin-bottom:16px;">
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-grn">decryptMessage</span>(<span class="pm">packet, receiverPrivKey, senderPubKey</span>)</div>
+        <div class="fn-desc">Hàm tổng hợp pipeline giải mã — gọi 3 hàm con, kiểm tra integrity và xác thực chữ ký, trả kết quả cuối</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-grn">P6 · CORE</span>
+          <span class="fn-badge tag-cyn">CLIENT-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">packet</span><span class="io-type">object</span><div class="io-note">{C, K', S, H, IV} nhận từ socket hoặc load từ Message Store</div></div>
+          <div class="io-row"><span class="io-name">receiverPrivKey</span><span class="io-type">CryptoKey</span><div class="io-note">Private Key của B — trong memory</div></div>
+          <div class="io-row"><span class="io-name">senderPubKey</span><span class="io-type">CryptoKey</span><div class="io-note">Public Key của A — từ <b>getPublicKey()</b></div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">plaintext</span><span class="io-type">string | null</span><div class="io-note">null nếu tamper detected</div></div>
+          <div class="io-row"><span class="io-name">isVerified</span><span class="io-type">boolean</span></div>
+          <div class="io-row"><span class="io-name">tamperAlert</span><span class="io-type">boolean</span></div>
+          <div class="io-next">→ plaintext + isVerified vào UI render · tamperAlert=true → cảnh báo user, update DB</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý — gọi tuần tự 3 hàm con + kiểm tra</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">K = decryptRSA(packet.K_enc, receiverPrivKey)</div><div class="sd">Khôi phục session key K từ K'.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">M = decryptAES(packet.C, K, packet.IV)</div><div class="sd">Giải mã ra plaintext M.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">H' = hashPlaintext(M)</div><div class="sd">Tính lại hash của M vừa giải mã được.</div></div></div>
+        <div class="step"><div class="sn">4</div><div class="sb"><div class="st">Kiểm tra integrity</div><div class="sa" style="background:#fee2e2;color:#991b1b;">if H' ≠ packet.H → tamperAlert = true</div><div class="sd">M bị thay đổi trên đường truyền → hash không khớp.</div></div></div>
+        <div class="step"><div class="sn">5</div><div class="sb"><div class="st">valid = verifySignature(packet.S, packet.H, senderPubKey)</div><div class="sa" style="background:#fee2e2;color:#991b1b;">if not valid → tamperAlert = true</div><div class="sd">Chữ ký không hợp lệ = không phải A gửi, hoặc S bị giả mạo.</div></div></div>
+        <div class="step"><div class="sn">6</div><div class="sb"><div class="st">Ghi kết quả vào DB</div><div class="sd">Update <code>messages</code>: <code>sigVerified</code>, <code>tamperAlert</code>, <code>status='read'</code>.</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fn-grid">
+
+    <!-- decryptRSA() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-grn">decryptRSA</span>(<span class="pm">K_enc, receiverPrivKey</span>)</div>
+        <div class="fn-desc">Giải mã session key K từ K' bằng RSA-OAEP</div>
+        <div class="fn-badges"><span class="fn-badge tag-grn">P6</span></div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">K_enc</span><span class="io-type">string (Base64)</span><div class="io-note">Session key đã RSA-encrypt (K')</div></div>
+          <div class="io-row"><span class="io-name">receiverPrivKey</span><span class="io-type">CryptoKey</span></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">K</span><span class="io-type">CryptoKey (AES 256-bit)</span></div>
+          <div class="io-next">→ vào <b>decryptAES()</b></div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="sa" style="background:var(--grn-l);color:var(--grn);">RSA-OAEP.decrypt(receiverPrivKey, base64decode(K_enc))</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="sd">Import rawKey → CryptoKey với algorithm AES-CBC, length 256.</div></div></div>
+      </div>
+    </div>
+
+    <!-- decryptAES() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-grn">decryptAES</span>(<span class="pm">C, K, IV</span>)</div>
+        <div class="fn-desc">Giải mã ciphertext bằng AES-256-CBC — khôi phục plaintext M</div>
+        <div class="fn-badges"><span class="fn-badge tag-grn">P6</span></div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">C</span><span class="io-type">string (Base64)</span><div class="io-note">Ciphertext</div></div>
+          <div class="io-row"><span class="io-name">K</span><span class="io-type">CryptoKey</span><div class="io-note">Session key từ <b>decryptRSA()</b></div></div>
+          <div class="io-row"><span class="io-name">IV</span><span class="io-type">string (Base64)</span><div class="io-note">Đã lưu trong packet</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">plaintext</span><span class="io-type">string</span><div class="io-note">Nội dung tin nhắn gốc M</div></div>
+          <div class="io-next">→ vào <b>hashPlaintext()</b> để tính H'</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="sa" style="background:var(--grn-l);color:var(--grn);">AES-256-CBC.decrypt(K, IV, base64decode(C))</div><div class="sd">Unpadding PKCS#7 tự động. Nếu K hoặc IV sai → throw error.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="sd">TextDecoder → UTF-8 string.</div></div></div>
+      </div>
+    </div>
+
+    <!-- verifySignature() -->
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-grn">verifySignature</span>(<span class="pm">S, H, senderPubKey</span>)</div>
+        <div class="fn-desc">Xác thực chữ ký RSA-PSS — Authentication + Non-repudiation</div>
+        <div class="fn-badges"><span class="fn-badge tag-grn">P6</span></div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">S</span><span class="io-type">string (Base64)</span><div class="io-note">Chữ ký trong packet</div></div>
+          <div class="io-row"><span class="io-name">H</span><span class="io-type">string (hex)</span><div class="io-note">Hash trong packet</div></div>
+          <div class="io-row"><span class="io-name">senderPubKey</span><span class="io-type">CryptoKey</span><div class="io-note">Public Key của sender A</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">valid</span><span class="io-type">boolean</span><div class="io-note">false = giả mạo hoặc bị tamper</div></div>
+          <div class="io-next">→ vào <b>decryptMessage()</b> để quyết định render hay alert</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="sa" style="background:var(--grn-l);color:var(--grn);">RSA-PSS.verify(senderPubKey, sigBytes, hashBytes)</div><div class="sd">WebCrypto trả về boolean. Verify dùng đúng keyID của lúc ký (senderKeyID) — hợp lệ ngay cả sau khi key bị revoke.</div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════ MODULE 6: HISTORY ════════════════ -->
+<div class="mod">
+  <div class="mod-hdr col-pur">
+    <h2>Module 6 — Message History <span class="mod-tag tag-pur">HISTORY · P7</span></h2>
+  </div>
+  <div class="fn-grid single">
+    <div class="fn-card">
+      <div class="fn-hd">
+        <div class="fn-sig"><span class="fn col-pur">loadHistory</span>(<span class="pm">contactID, page, receiverPrivKey, senderPubKey</span>)</div>
+        <div class="fn-desc">Tải lịch sử từ Message Store, giải mã và xác thực từng packet — tái sử dụng decryptMessage()</div>
+        <div class="fn-badges">
+          <span class="fn-badge tag-pur">P7</span>
+          <span class="fn-badge tag-cyn">CLIENT-SIDE</span>
+        </div>
+      </div>
+      <div class="io-wrap">
+        <div class="io-blk">
+          <div class="io-lbl">Input</div>
+          <div class="io-row"><span class="io-name">contactID</span><span class="io-type">int</span><div class="io-note">Lấy lịch sử hội thoại với contact này</div></div>
+          <div class="io-row"><span class="io-name">page</span><span class="io-type">int</span><div class="io-note">Pagination — 20 tin mỗi trang</div></div>
+          <div class="io-row"><span class="io-name">receiverPrivKey</span><span class="io-type">CryptoKey</span><div class="io-note">PrivKey của user đang đăng nhập</div></div>
+          <div class="io-row"><span class="io-name">senderPubKey</span><span class="io-type">CryptoKey</span><div class="io-note">PubKey của contact để verify sig</div></div>
+        </div>
+        <div class="io-blk">
+          <div class="io-lbl">Output</div>
+          <div class="io-row"><span class="io-name">messages[]</span><span class="io-type">array</span></div>
+          <div class="io-row"><span class="io-name">&nbsp;↳ msgID</span><span class="io-type">int</span></div>
+          <div class="io-row"><span class="io-name">&nbsp;↳ timestamp</span><span class="io-type">string</span></div>
+          <div class="io-row"><span class="io-name">&nbsp;↳ plaintext</span><span class="io-type">string | null</span></div>
+          <div class="io-row"><span class="io-name">&nbsp;↳ isVerified</span><span class="io-type">boolean</span></div>
+          <div class="io-row"><span class="io-name">&nbsp;↳ tamperAlert</span><span class="io-type">boolean</span></div>
+          <div class="io-next">→ render chat UI với badge ✓ verified hoặc ⚠ tamper</div>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="steps-lbl">Quá trình xử lý</div>
+        <div class="step"><div class="sn">1</div><div class="sb"><div class="st">Fetch packets từ Message Store</div><div class="sd">API <code>GET /messages?contactID=X&page=N&limit=20&order=DESC</code>. Server trả về mảng các packet <code>{C, K', S, H, IV}</code> — không giải mã.</div></div></div>
+        <div class="step"><div class="sn">2</div><div class="sb"><div class="st">Giải mã từng packet</div><div class="sa" style="background:var(--pur-l);color:var(--pur);">for pkt of packets → decryptMessage(pkt, privKey, pubKey)</div><div class="sd">Tái sử dụng hoàn toàn pipeline P6. Mỗi tin nhắn được verify lại signature và integrity độc lập.</div></div></div>
+        <div class="step"><div class="sn">3</div><div class="sb"><div class="st">Xử lý kết quả</div><div class="sd">Nếu <code>tamperAlert=true</code> → hiển thị cảnh báo thay vì nội dung. Nếu <code>isVerified=false</code> → thêm badge ⚠ bên cạnh tin.</div></div></div>
+        <div class="step"><div class="sn">4</div><div class="sb"><div class="st">Return mảng đã giải mã</div><div class="sd">Render chat UI với đầy đủ thông tin xác thực cho mỗi tin nhắn.</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
