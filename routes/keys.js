@@ -100,4 +100,32 @@ router.get('/history', (req, res) => {
   res.json(keys);
 });
 
+// ─────────────────────────────────────────────
+//  GET /api/keys/all
+//  Get ALL key pairs for current user (active + revoked)
+//  Returns encrypted private key so client can decrypt old messages
+// ─────────────────────────────────────────────
+router.get('/all', (req, res) => {
+  const keys = db.prepare(`
+    SELECT keyID, publicKey, privateKey, status, createdAt, revokedAt
+    FROM key_pairs WHERE userID=? ORDER BY createdAt DESC
+  `).all(req.user.userID);
+  res.json(keys);
+});
+
+// ─────────────────────────────────────────────
+//  GET /api/keys/user/:userID/public-all
+//  Get ALL public keys (active + revoked) for a user
+//  Used to verify signatures on old messages after key rotation
+//  Only returns public keys — private keys are never exposed
+// ─────────────────────────────────────────────
+router.get('/user/:targetID/public-all', (req, res) => {
+  const targetID = parseInt(req.params.targetID);
+  const keys = db.prepare(`
+    SELECT keyID, publicKey, status, createdAt
+    FROM key_pairs WHERE userID=? ORDER BY createdAt DESC
+  `).all(targetID);
+  res.json(keys);
+});
+
 module.exports = router;

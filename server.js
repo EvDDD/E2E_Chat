@@ -79,6 +79,7 @@ io.on('connection', (socket) => {
       receiverKeyID: msg.receiverKeyID,
       ciphertext:    msg.ciphertext,
       encSessionKey: msg.encSessionKey,
+      // senderEncSessionKey only needed for history loading, not real-time delivery
       signature:     msg.signature,
       hashValue:     msg.hashValue,
       aesIV:         msg.aesIV,

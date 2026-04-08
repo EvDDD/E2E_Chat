@@ -18,7 +18,7 @@ router.post('/', (req, res) => {
   const { senderID: _s, ...rest } = req.body; // ignore any senderID from body
   const senderID = req.user.userID;
   const {
-    receiverID, ciphertext, encSessionKey,
+    receiverID, ciphertext, encSessionKey, senderEncSessionKey,
     signature, hashValue, aesIV, receiverKeyID
   } = req.body;
 
@@ -50,10 +50,11 @@ router.post('/', (req, res) => {
   const result = db.prepare(`
     INSERT INTO messages
       (senderID, receiverID, senderKeyID, receiverKeyID,
-       ciphertext, encSessionKey, signature, hashValue, aesIV, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent')
+       ciphertext, encSessionKey, senderEncSessionKey, signature, hashValue, aesIV, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent')
   `).run(senderID, receiverID, senderKey.keyID, receiverKeyID,
-         ciphertext, encSessionKey, signature, hashValue, aesIV);
+         ciphertext, encSessionKey, senderEncSessionKey || null,
+         signature, hashValue, aesIV);
 
   const messageID = result.lastInsertRowid;
 
@@ -67,6 +68,7 @@ router.post('/', (req, res) => {
         ciphertext, encSessionKey, signature, hashValue, aesIV,
         senderKeyID: senderKey.keyID, receiverKeyID,
         timestamp: new Date().toISOString()
+        // Note: senderEncSessionKey is NOT sent to receiver — only sender needs it
       });
       db.prepare(
         "UPDATE messages SET status='delivered' WHERE messageID=?"
@@ -97,12 +99,13 @@ router.get('/:contactID', (req, res) => {
     SELECT
       m.messageID, m.senderID, m.receiverID,
       m.senderKeyID, m.receiverKeyID,
-      m.ciphertext, m.encSessionKey, m.signature, m.hashValue, m.aesIV,
+      m.ciphertext, m.encSessionKey, m.senderEncSessionKey,
+      m.signature, m.hashValue, m.aesIV,
       m.timestamp, m.status, m.sigVerified, m.tamperAlert
     FROM messages m
     WHERE (m.senderID=? AND m.receiverID=?)
        OR (m.senderID=? AND m.receiverID=?)
-    ORDER BY m.timestamp DESC
+    ORDER BY m.timestamp DESC, m.messageID DESC
     LIMIT ? OFFSET ?
   `).all(myID, contactID, contactID, myID, limit, offset);
 
@@ -138,12 +141,14 @@ router.patch('/:messageID/verify', (req, res) => {
 
   // Only receiver can report verification
   const msg = db.prepare(
-    'SELECT receiverID FROM messages WHERE messageID=?'
+    'SELECT receiverID, sigVerified, tamperAlert FROM messages WHERE messageID=?'
   ).get(messageID);
   if (!msg || msg.receiverID !== myID) {
     return res.status(403).json({ error: 'Không có quyền' });
   }
 
+  // Always update — especially important when tamperAlert is newly detected
+  // even if message was previously marked as verified
   db.prepare(`
     UPDATE messages
     SET sigVerified=?, tamperAlert=?, status='read'

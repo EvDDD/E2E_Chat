@@ -99,3 +99,10 @@ db.exec(`
 `);
 
 module.exports = db;
+
+// Migrate: Add senderEncSessionKey column if it doesn't exist (for Bug 5 fix)
+try {
+  db.prepare('ALTER TABLE messages ADD COLUMN senderEncSessionKey TEXT').run();
+} catch (e) {
+  // Column already exists — safe to ignore
+}

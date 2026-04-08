@@ -1,6 +1,6 @@
 /**
- * app.js — E2EE Chat v3
- * Changes: invitation flow, bidirectional contacts, sessionStorage JWT, reload unlock
+ * app.js — E2EE Chat v3 (bugfix edition)
+ * Fixed bugs: 1, 2, 4, 5, 6
  */
 'use strict';
 
@@ -13,6 +13,8 @@ const State = {
   privKeySign:    null,
   privKeyDecrypt: null,
   pubKeyB64:      null,
+  pubKeyForEncrypt: null,   // Bug 5: CryptoKey for self-encrypt
+  keyMap:         {},       // Bug 2: keyID → CryptoKey (decrypt) for all known keys
   currentContact: null,
   contacts:       [],
   messages:       {}
@@ -56,6 +58,7 @@ function connectSocket() {
     } catch { ui.addMessage(packet, null, { tamperAlert:true, isVerified:false }); return; }
 
     const result = await E2EE.decryptMessage(packet, State.privKeyDecrypt, senderPubKey);
+    // Bug 4: always PATCH to update tamperAlert in DB, not just on first verify
     await api('PATCH', `/messages/${packet.messageID}/verify`, {
       sigVerified: result.isVerified, tamperAlert: result.tamperAlert
     }).catch(()=>{});
@@ -71,8 +74,6 @@ function connectSocket() {
 
 // ─────────────────────────────────────────────
 //  Session persistence (JWT in sessionStorage)
-//  Private key stays in memory only — requires
-//  passphrase re-entry on page reload
 // ─────────────────────────────────────────────
 function saveSession(token, userID, username, displayName, encPrivKey) {
   sessionStorage.setItem('e2ee_session', JSON.stringify({ token, userID, username, displayName, encPrivKey }));
@@ -85,13 +86,12 @@ function loadSession() {
 function clearSession() { sessionStorage.removeItem('e2ee_session'); }
 
 // ─────────────────────────────────────────────
-//  Boot: check for existing session on page load
+//  Boot
 // ─────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   const saved = loadSession();
   if (!saved) { ui.showAuth(); return; }
 
-  // Restore token and user info
   Object.assign(State, {
     token:       saved.token,
     userID:      saved.userID,
@@ -100,7 +100,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     encPrivKey:  saved.encPrivKey
   });
 
-  // Private key NOT in memory — ask for passphrase
   ui.showUnlock();
 });
 
@@ -142,6 +141,9 @@ async function login(username, password, passphrase) {
     const keyData = await api('GET', '/keys/me');
     State.pubKeyB64 = keyData.publicKey;
 
+    // Bug 2: unlock all historical keys
+    await unlockAllKeys(passphrase);
+
     saveSession(State.token, State.userID, State.username, State.displayName, data.encPrivKey);
     connectSocket();
     await loadContacts();
@@ -155,12 +157,13 @@ async function unlock(passphrase) {
   const saved = loadSession();
   if (!saved) throw new Error('Không tìm thấy phiên đăng nhập. Vui lòng đăng nhập lại.');
 
-  // Re-decrypt private key into memory
-  await unlockKeys(saved.encPrivKey, passphrase); // throws if wrong passphrase
+  await unlockKeys(saved.encPrivKey, passphrase);
 
-  // Restore pubkey
   const keyData = await api('GET', '/keys/me');
   State.pubKeyB64 = keyData.publicKey;
+
+  // Bug 2: unlock all historical keys
+  await unlockAllKeys(passphrase);
 
   connectSocket();
   await loadContacts();
@@ -172,11 +175,42 @@ async function unlockKeys(encPrivKey, passphrase) {
   State.privKeyDecrypt = await E2EE.importPrivateKeyForDecrypt(encPrivKey, passphrase);
 }
 
+/**
+ * Bug 2 + 5: Unlock ALL historical keys (active + revoked).
+ * Also imports own active pubkey for encryption (Bug 5 dual encrypt).
+ */
+async function unlockAllKeys(passphrase) {
+  State.keyMap = {};
+  try {
+    const allKeys = await api('GET', '/keys/all');
+    for (const k of allKeys) {
+      try {
+        const privKey = await E2EE.importPrivateKeyForDecrypt(k.privateKey, passphrase);
+        State.keyMap[k.keyID] = privKey;
+      } catch {
+        // Wrong passphrase for this key, or corrupted — skip
+        State.keyMap[k.keyID] = null;
+      }
+    }
+    // Bug 5: import own active public key for self-encryption
+    if (State.pubKeyB64) {
+      State.pubKeyForEncrypt = await E2EE.importPublicKeyForEncrypt(State.pubKeyB64);
+    }
+  } catch(e) {
+    // Non-critical — main keys still work for new messages
+    console.warn('unlockAllKeys failed:', e.message);
+  }
+}
+
 async function logout() {
   try { await api('POST', '/auth/logout'); } catch {}
   socket?.disconnect();
   clearSession();
-  Object.assign(State, { token:null, userID:null, username:null, encPrivKey:null, privKeySign:null, privKeyDecrypt:null, pubKeyB64:null, currentContact:null, contacts:[], messages:{} });
+  Object.assign(State, {
+    token:null, userID:null, username:null, encPrivKey:null,
+    privKeySign:null, privKeyDecrypt:null, pubKeyB64:null, pubKeyForEncrypt:null,
+    keyMap:{}, currentContact:null, contacts:[], messages:{}
+  });
   ui.showAuth();
 }
 
@@ -187,7 +221,6 @@ async function loadContacts() {
   const data = await api('GET', '/contacts');
   State.contacts = data;
   ui.renderContacts(data);
-  // Refresh pending request badge
   ui.loadPendingRequests().catch(()=>{});
 }
 
@@ -201,7 +234,7 @@ async function getPendingRequests() {
 
 async function acceptRequest(requestID) {
   await api('POST', `/contacts/requests/${requestID}/accept`);
-  await loadContacts(); // refresh both sides
+  await loadContacts();
 }
 
 async function rejectRequest(requestID) {
@@ -227,10 +260,42 @@ async function openChat(contactUserID) {
 async function sendMessage(plaintext) {
   if (!State.currentContact || !plaintext.trim()) return;
   try {
-    const receiverPubKey = await E2EE.importPublicKeyForEncrypt(State.currentContact.pubKeyB64);
-    const packet         = await E2EE.encryptMessage(plaintext, receiverPubKey, State.privKeySign);
-    const result         = await api('POST', '/messages', { receiverID: State.currentContact.userID, receiverKeyID: State.currentContact.keyID, ...packet });
-    ui.addMessage({ messageID: result.messageID, senderID: State.userID, timestamp: new Date().toISOString() }, plaintext, { isVerified:true, tamperAlert:false }, true);
+    // Bug 1: always re-fetch receiver's latest public key before encrypting
+    // (in case they revoked and regenerated their key while chat was open)
+    const kd = await api('GET', `/contacts/pubkey/${State.currentContact.userID}`);
+    if (kd.keyChanged) {
+      ui.toast('⚠ Public key người nhận đã thay đổi, đang dùng khóa mới nhất.', 'warn');
+      State.currentContact.pubKeyB64 = kd.publicKey;
+      State.currentContact.keyID     = kd.keyID;
+    }
+
+    const receiverPubKey = await E2EE.importPublicKeyForEncrypt(kd.publicKey);
+
+    // Bug 5: also encrypt with sender's own pubkey (dual encryption)
+    const packet = await E2EE.encryptMessage(
+      plaintext, receiverPubKey, State.privKeySign, State.pubKeyForEncrypt
+    );
+
+    const result = await api('POST', '/messages', {
+      receiverID:    State.currentContact.userID,
+      receiverKeyID: kd.keyID,
+      ...packet
+    });
+
+    // Update keyMap with sender's current key (for decrypting own future history)
+    const myKeyData = await api('GET', '/keys/me').catch(() => null);
+    if (myKeyData && !State.keyMap[myKeyData.keyID]) {
+      try {
+        State.keyMap[myKeyData.keyID] = State.privKeyDecrypt;
+      } catch {}
+    }
+
+    ui.addMessage(
+      { messageID: result.messageID, senderID: State.userID, timestamp: new Date().toISOString() },
+      plaintext,
+      { isVerified:true, tamperAlert:false },
+      true
+    );
     socket?.emit('stop_typing', { toUserID: State.currentContact.userID });
   } catch(err) { ui.toast('Gửi tin thất bại: '+err.message, 'error'); }
 }
@@ -239,17 +304,86 @@ async function loadHistory(contactID, page=1) {
   ui.setHistoryLoading(true);
   try {
     const data = await api('GET', `/messages/${contactID}?page=${page}&limit=20`);
-    const kd   = await api('GET', `/contacts/pubkey/${contactID}`);
-    const senderPubKey = await E2EE.importPublicKeyForVerify(kd.publicKey);
-    for (const msg of data.messages) {
-      if (msg.senderID === State.userID) { ui.renderHistoryMessage(msg, null, null, true); }
-      else {
-        const r = await E2EE.decryptMessage(msg, State.privKeyDecrypt, senderPubKey);
-        if (!msg.sigVerified && !msg.tamperAlert) await api('PATCH', `/messages/${msg.messageID}/verify`, { sigVerified:r.isVerified, tamperAlert:r.tamperAlert }).catch(()=>{});
-        ui.renderHistoryMessage(msg, r.plaintext, r, false);
+
+    // Fetch ALL public keys of the contact (active + revoked) for signature verification.
+    // After key rotation, old messages were signed with the OLD private key,
+    // so we need the matching OLD public key to verify — not the current one.
+    const contactAllKeys = await api('GET', `/keys/user/${contactID}/public-all`);
+    const contactPubKeyMap = {};  // keyID → CryptoKey (for verify)
+    for (const k of contactAllKeys) {
+      try {
+        contactPubKeyMap[k.keyID] = await E2EE.importPublicKeyForVerify(k.publicKey);
+      } catch { /* skip corrupt key */ }
+    }
+
+    const myID = State.userID;
+    const isPaging = page > 1;
+
+    // Bug 6 FIX: when prepending (load more), iterate in reverse order (newest → oldest)
+    // because each insertBefore pushes the element to the very top.
+    // After all inserts: oldest ends up at top of batch → correct chronological display.
+    const msgsToRender = isPaging ? [...data.messages].reverse() : data.messages;
+
+    for (const msg of msgsToRender) {
+      if (msg.senderID === myID) {
+        // OWN SENT MESSAGES: decrypt using senderEncSessionKey + own historical private key
+        let plaintext = null;
+        if (msg.senderEncSessionKey) {
+          // senderEncSessionKey was encrypted with OUR pubkey at send time.
+          // After key rotation, need the OLD private key → lookup by senderKeyID.
+          const myPrivKey = State.keyMap[msg.senderKeyID] || State.privKeyDecrypt;
+          if (myPrivKey) {
+            try {
+              const K = await E2EE.decryptRSA(msg.senderEncSessionKey, myPrivKey);
+              plaintext = await E2EE.decryptAES(msg.ciphertext, K, msg.aesIV);
+            } catch {
+              plaintext = null;
+            }
+          }
+        }
+        ui.renderHistoryMessage(msg, plaintext, null, true, isPaging);
+      } else {
+        // RECEIVED MESSAGES: decrypt with own historical private key + verify with sender's historical pubkey
+        const privKeyDecrypt = State.keyMap[msg.receiverKeyID] || State.privKeyDecrypt;
+
+        // Use the sender's pubkey that matches senderKeyID (the key used to sign this message)
+        const senderPubKey = contactPubKeyMap[msg.senderKeyID] || null;
+
+        let r;
+        if (!senderPubKey) {
+          // Can't find matching pubkey for verification — still try to decrypt
+          try {
+            const K = await E2EE.decryptRSA(msg.encSessionKey, privKeyDecrypt);
+            const plaintext = await E2EE.decryptAES(msg.ciphertext, K, msg.aesIV);
+            r = { plaintext, isVerified: false, tamperAlert: false };
+          } catch {
+            r = { plaintext: null, isVerified: false, tamperAlert: true };
+          }
+        } else {
+          try {
+            r = await E2EE.decryptMessage(msg, privKeyDecrypt, senderPubKey);
+          } catch {
+            r = { plaintext: null, isVerified: false, tamperAlert: true };
+          }
+        }
+
+        // Bug 4: always PATCH when tamper detected
+        if (r.tamperAlert || !msg.sigVerified) {
+          await api('PATCH', `/messages/${msg.messageID}/verify`, {
+            sigVerified: r.isVerified,
+            tamperAlert: r.tamperAlert
+          }).catch(()=>{});
+        }
+        ui.renderHistoryMessage(msg, r.plaintext, r, false, isPaging);
       }
     }
-    if (data.hasMore) ui.showLoadMoreBtn(contactID, page+1);
+
+    // Bug 6: show/hide load-more button correctly
+    if (data.hasMore) {
+      ui.showLoadMoreBtn(contactID, page + 1);
+    } else {
+      ui.hideLoadMoreBtn();
+    }
   } catch(err) { ui.toast('Tải lịch sử thất bại: '+err.message, 'error'); }
   ui.setHistoryLoading(false);
 }
@@ -260,6 +394,8 @@ async function revokeAndRegenKey(passphrase, reason) {
   Object.assign(State, { pubKeyB64, encPrivKey });
   await api('POST', '/keys', { publicKey: pubKeyB64, privateKey: encPrivKey });
   await unlockKeys(encPrivKey, passphrase);
+  // Bug 2: refresh keyMap with all keys after regen
+  await unlockAllKeys(passphrase);
   saveSession(State.token, State.userID, State.username, State.displayName, encPrivKey);
   ui.toast('Khóa mới đã được tạo và kích hoạt.', 'success');
 }

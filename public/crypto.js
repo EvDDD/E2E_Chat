@@ -301,21 +301,23 @@ async function signHash(H, senderPrivKey) {
 }
 
 /**
- * encryptMessage(plaintext, receiverPubKey, senderPrivKey)
+ * encryptMessage(plaintext, receiverPubKey, senderPrivKey, senderPubKey?)
  *
  * INPUT : plaintext     : string
  *         receiverPubKey: CryptoKey (RSA-OAEP)
  *         senderPrivKey : CryptoKey (RSA-PSS)
- * OUTPUT: packet = { C, encSessionKey (K'), signature (S), hashValue (H), aesIV (IV) }
+ *         senderPubKey  : CryptoKey (RSA-OAEP) [optional] — for dual encryption
+ * OUTPUT: packet = { C, encSessionKey (K'), senderEncSessionKey, signature (S), hashValue (H), aesIV (IV) }
  *
  * ALGORITHM: Hybrid encryption pipeline
  *   1. H  = SHA-256(M)
  *   2. K  = random AES-256 key, IV = random 16 bytes
  *   3. C  = AES-256-CBC(K, IV, M)
  *   4. K' = RSA-OAEP(receiverPubKey, K)
+ *   4b. K_s = RSA-OAEP(senderPubKey, K)   [if senderPubKey provided]
  *   5. S  = RSA-PSS(senderPrivKey, H)
  */
-async function encryptMessage(plaintext, receiverPubKey, senderPrivKey) {
+async function encryptMessage(plaintext, receiverPubKey, senderPrivKey, senderPubKey = null) {
   // Step 1: hash plaintext before encryption
   const H = await hashPlaintext(plaintext);
 
@@ -333,15 +335,22 @@ async function encryptMessage(plaintext, receiverPubKey, senderPrivKey) {
   // Step 4: encrypt session key with receiver's RSA public key
   const Kprime = await encryptRSA(K, receiverPubKey);
 
+  // Step 4b: also encrypt session key with sender's own public key (dual encryption)
+  let senderEncSessionKey = null;
+  if (senderPubKey) {
+    senderEncSessionKey = await encryptRSA(K, senderPubKey);
+  }
+
   // Step 5: sign hash with sender's RSA private key
   const S = await signHash(H, senderPrivKey);
 
   return {
-    ciphertext:    C,
-    encSessionKey: Kprime,
-    signature:     S,
-    hashValue:     H,
-    aesIV:         bufToB64(IV)
+    ciphertext:          C,
+    encSessionKey:       Kprime,
+    senderEncSessionKey: senderEncSessionKey,
+    signature:           S,
+    hashValue:           H,
+    aesIV:               bufToB64(IV)
   };
 }
 

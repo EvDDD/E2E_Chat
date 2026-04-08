@@ -127,8 +127,11 @@ router.get('/pubkey/:targetID', (req, res) => {
   const targetID = parseInt(req.params.targetID);
   const currentKey = db.prepare("SELECT keyID, publicKey FROM key_pairs WHERE userID=? AND status='active'").get(targetID);
   if (!currentKey) return res.status(404).json({ error: 'Người dùng chưa có khóa' });
-  const contact    = db.prepare('SELECT cachedKeyID FROM contacts WHERE ownerID=? AND contactUserID=?').get(myID, targetID);
-  const keyChanged = !!(contact && contact.cachedKeyID && contact.cachedKeyID !== currentKey.keyID);
+  const contact    = db.prepare('SELECT cachedKeyID, cachedPubKey FROM contacts WHERE ownerID=? AND contactUserID=?').get(myID, targetID);
+  const keyChanged = !!(contact && (
+    (contact.cachedKeyID && contact.cachedKeyID !== currentKey.keyID) ||
+    (contact.cachedPubKey && contact.cachedPubKey !== currentKey.publicKey)
+  ));
   if (contact) db.prepare('UPDATE contacts SET cachedKeyID=?,cachedPubKey=? WHERE ownerID=? AND contactUserID=?')
     .run(currentKey.keyID, currentKey.publicKey, myID, targetID);
   res.json({ keyID: currentKey.keyID, publicKey: currentKey.publicKey, keyChanged });

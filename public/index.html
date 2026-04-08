@@ -401,7 +401,7 @@ const ui = (() => {
     $(`unread-${contact.userID}`)?.style.setProperty('display','none');
   }
 
-  function addMessage(packet, plaintext, result, isSent=false) {
+  function addMessage(packet, plaintext, result, isSent=false, prepend=false) {
     const msgs   = $('msgs');
     const div    = document.createElement('div');
     const isMine = packet.senderID===App.getState().userID || isSent;
@@ -411,12 +411,23 @@ const ui = (() => {
     const content = tamper ? '⚠ Tin nhắn bị giả mạo hoặc toàn vẹn thất bại' : esc(plaintext||'–');
     const badge   = tamper ? '<span class="tbadge">⚠ tamper</span>' : (!isSent && result?.isVerified ? '<span class="vbadge">✓</span>' : '');
     div.innerHTML = `<div class="bubble-body${tamper?' tamper':''}">${content}</div><div class="bubble-meta"><span>${time}</span>${badge}</div>`;
-    msgs.appendChild(div);
-    msgs.scrollTop = msgs.scrollHeight;
+    if (prepend) {
+      const firstBubble = [...msgs.children].find(c => c.classList.contains('bubble'));
+      const scrollBottom = msgs.scrollHeight - msgs.scrollTop;
+      if (firstBubble) { msgs.insertBefore(div, firstBubble); } else { msgs.appendChild(div); }
+      msgs.scrollTop = msgs.scrollHeight - scrollBottom;
+    } else {
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
   }
-  function renderHistoryMessage(msg, plaintext, result, isMine) { addMessage(msg, plaintext||(isMine?'[Tin của bạn]':null), result, isMine); }
+  function renderHistoryMessage(msg, plaintext, result, isMine, isPaging=false) {
+    const text = (plaintext !== null && plaintext !== undefined) ? plaintext : (isMine && !isPaging ? '[Tin của bạn]' : null);
+    addMessage(msg, text, result, isMine, isPaging);
+  }
   function setHistoryLoading(on) { $('hist-load').style.display = on?'block':'none'; }
   function showLoadMoreBtn(cid, page) { _loadMorePage=page; _loadMoreCID=cid; $('load-more').style.display='block'; }
+  function hideLoadMoreBtn() { $('load-more').style.display='none'; }
   function loadMore() { if (_loadMoreCID) App.loadHistory(_loadMoreCID, _loadMorePage); }
 
   function msgKey(e) { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); send(); } }
@@ -560,7 +571,7 @@ const ui = (() => {
     showAuth, showUnlock, showApp, setStatus,
     renderContacts, filterContacts, showUnread,
     openChatPanel, addMessage, renderHistoryMessage,
-    setHistoryLoading, showLoadMoreBtn, loadMore,
+    setHistoryLoading, showLoadMoreBtn, hideLoadMoreBtn, loadMore,
     msgKey, send, msgInput, showTyping, hideTyping,
     openAddModal, closeAddModal, switchAddTab,
     userSearch, sendRequest, loadPendingRequests,
