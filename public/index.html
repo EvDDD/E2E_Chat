@@ -422,7 +422,7 @@ const ui = (() => {
     }
   }
   function renderHistoryMessage(msg, plaintext, result, isMine, isPaging=false) {
-    const text = (plaintext !== null && plaintext !== undefined) ? plaintext : (isMine && !isPaging ? '[Tin của bạn]' : null);
+    const text = (plaintext !== null && plaintext !== undefined) ? plaintext : (isMine ? '[Không thể giải mã tin nhắn cũ]' : null);
     addMessage(msg, text, result, isMine, isPaging);
   }
   function setHistoryLoading(on) { $('hist-load').style.display = on?'block':'none'; }

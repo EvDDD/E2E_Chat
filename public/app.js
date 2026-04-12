@@ -119,6 +119,9 @@ async function register(username, email, password, passphrase) {
     await api('POST', '/keys', { publicKey: pubKeyB64, privateKey: encPrivKey });
     await unlockKeys(encPrivKey, passphrase);
 
+    // Unlock all keys + init pubKeyForEncrypt for dual encryption (Bug 5)
+    await unlockAllKeys(passphrase);
+
     saveSession(State.token, State.userID, State.username, State.displayName, encPrivKey);
     connectSocket();
     await loadContacts();
@@ -173,6 +176,10 @@ async function unlock(passphrase) {
 async function unlockKeys(encPrivKey, passphrase) {
   State.privKeySign    = await E2EE.decryptPrivateKey(encPrivKey, passphrase);
   State.privKeyDecrypt = await E2EE.importPrivateKeyForDecrypt(encPrivKey, passphrase);
+  // Always re-import pubKeyForEncrypt for dual encryption (must match current pubKeyB64)
+  if (State.pubKeyB64) {
+    State.pubKeyForEncrypt = await E2EE.importPublicKeyForEncrypt(State.pubKeyB64);
+  }
 }
 
 /**
