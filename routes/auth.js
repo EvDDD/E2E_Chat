@@ -22,8 +22,17 @@ router.post('/register', async (req, res) => {
   if (username.length < 3 || username.length > 50) {
     return res.status(400).json({ error: 'username phải từ 3–50 ký tự' });
   }
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    return res.status(400).json({ error: 'username chỉ được chứa chữ cái, số và dấu gạch dưới' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Email không hợp lệ' });
+  }
   if (password.length < 8) {
     return res.status(400).json({ error: 'password phải ít nhất 8 ký tự' });
+  }
+  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+    return res.status(400).json({ error: 'password phải chứa ít nhất 1 chữ hoa, 1 chữ thường và 1 số' });
   }
 
   // 2. Check uniqueness

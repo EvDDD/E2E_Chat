@@ -88,11 +88,11 @@ input,textarea{font-family:inherit}
 .chat-hdr-info p{font-size:11px;color:var(--grn)}
 .e2ee-badge{margin-left:auto;background:var(--grn-l);color:var(--grn);border:1px solid var(--grn-b);border-radius:6px;font-size:10px;font-weight:700;padding:3px 8px;letter-spacing:.5px}
 
-.msgs{flex:1;overflow-y:auto;padding:14px 20px;display:flex;flex-direction:column;gap:8px}
-.bubble{max-width:68%;display:flex;flex-direction:column}
+.msgs{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 20px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.bubble{max-width:68%;display:flex;flex-direction:column;overflow:hidden}
 .bubble.sent{align-self:flex-end}
 .bubble.recv{align-self:flex-start}
-.bubble-body{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5}
+.bubble-body{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:pre-wrap;min-width:0}
 .sent .bubble-body{background:var(--cyan);color:#fff;border-bottom-right-radius:4px}
 .recv .bubble-body{background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:4px}
 .bubble-body.tamper{background:var(--red-l)!important;border:1px solid var(--red-b)!important;color:var(--red)!important}
@@ -166,16 +166,16 @@ input,textarea{font-family:inherit}
       <button class="auth-tab"        onclick="ui.tab('register')">Đăng ký</button>
     </div>
     <form id="login-form" onsubmit="ui.doLogin(event)">
-      <div class="fg"><label>Tên đăng nhập</label><input id="lu" type="text" required placeholder="username"/></div>
-      <div class="fg"><label>Mật khẩu</label><input id="lp" type="password" required placeholder="••••••••"/></div>
-      <div class="fg"><label>Passphrase (giải mã khóa riêng tư)</label><input id="lpp" type="password" required placeholder="passphrase của bạn"/><p class="hint">Passphrase chỉ dùng trong browser, không gửi lên server</p></div>
+      <div class="fg"><label>Tên đăng nhập</label><input id="lu" type="text" required placeholder="username" minlength="3"/></div>
+      <div class="fg"><label>Mật khẩu</label><input id="lp" type="password" required placeholder="••••••••" minlength="8"/></div>
+      <div class="fg"><label>Passphrase (giải mã khóa riêng tư)</label><input id="lpp" type="password" required placeholder="passphrase của bạn" minlength="6"/><p class="hint">Passphrase chỉ dùng trong browser, không gửi lên server</p></div>
       <button class="btn-primary" id="login-btn" type="submit">Đăng nhập</button>
     </form>
     <form id="register-form" onsubmit="ui.doRegister(event)" style="display:none">
-      <div class="fg"><label>Tên đăng nhập</label><input id="ru" type="text" required placeholder="username (≥3 ký tự)"/></div>
+      <div class="fg"><label>Tên đăng nhập</label><input id="ru" type="text" required placeholder="3–50 ký tự, chữ/số/gạch dưới" minlength="3" maxlength="50" pattern="[a-zA-Z0-9_]+"/></div>
       <div class="fg"><label>Email</label><input id="re" type="email" required placeholder="email@example.com"/></div>
-      <div class="fg"><label>Mật khẩu</label><input id="rp" type="password" required placeholder="≥8 ký tự"/></div>
-      <div class="fg"><label>Passphrase (bảo vệ khóa riêng tư)</label><input id="rpp" type="password" required placeholder="Tạo một passphrase mạnh"/><p class="hint">⚠ Không thể khôi phục nếu quên passphrase</p></div>
+      <div class="fg"><label>Mật khẩu</label><input id="rp" type="password" required placeholder="≥8 ký tự, chứa hoa/thường/số" minlength="8"/></div>
+      <div class="fg"><label>Passphrase (bảo vệ khóa riêng tư)</label><input id="rpp" type="password" required placeholder="≥6 ký tự" minlength="6"/><p class="hint">⚠ Không thể khôi phục nếu quên passphrase</p></div>
       <button class="btn-primary" id="reg-btn" type="submit">Đăng ký &amp; Tạo khóa RSA</button>
     </form>
     <div id="loading-txt" class="loading-txt"></div>

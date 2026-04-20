@@ -106,9 +106,46 @@ window.addEventListener('DOMContentLoaded', async () => {
 // ─────────────────────────────────────────────
 //  Auth
 // ─────────────────────────────────────────────
+// ─── Input Validation Helpers ───
+const Validate = {
+  username(v) {
+    if (!v) return 'Tên đăng nhập là bắt buộc.';
+    if (v.length < 3 || v.length > 50) return 'Tên đăng nhập phải từ 3–50 ký tự.';
+    if (!/^[a-zA-Z0-9_]+$/.test(v)) return 'Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới.';
+    return null;
+  },
+  email(v) {
+    if (!v) return 'Email là bắt buộc.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Email không hợp lệ.';
+    return null;
+  },
+  password(v) {
+    if (!v) return 'Mật khẩu là bắt buộc.';
+    if (v.length < 8) return 'Mật khẩu phải ít nhất 8 ký tự.';
+    if (!/[A-Z]/.test(v)) return 'Mật khẩu phải chứa ít nhất 1 chữ hoa.';
+    if (!/[a-z]/.test(v)) return 'Mật khẩu phải chứa ít nhất 1 chữ thường.';
+    if (!/[0-9]/.test(v)) return 'Mật khẩu phải chứa ít nhất 1 số.';
+    return null;
+  },
+  passphrase(v) {
+    if (!v) return 'Passphrase là bắt buộc.';
+    if (v.length < 6) return 'Passphrase phải ít nhất 6 ký tự.';
+    return null;
+  },
+  message(v) {
+    if (!v || !v.trim()) return 'Tin nhắn không được để trống.';
+    if (v.length > 5000) return 'Tin nhắn không được vượt quá 5000 ký tự.';
+    return null;
+  }
+};
+
 async function register(username, email, password, passphrase) {
   ui.setLoading(true);
   try {
+    // Client-side validation
+    const err = Validate.username(username) || Validate.email(email) || Validate.password(password) || Validate.passphrase(passphrase);
+    if (err) throw new Error(err);
+
     const data = await api('POST', '/auth/register', { username, email, password });
     Object.assign(State, { token: data.sessionToken, userID: data.userID, username: data.username, displayName: data.displayName });
 
@@ -133,6 +170,12 @@ async function register(username, email, password, passphrase) {
 async function login(username, password, passphrase) {
   ui.setLoading(true);
   try {
+    // Client-side validation
+    if (!username) throw new Error('Tên đăng nhập là bắt buộc.');
+    if (!password) throw new Error('Mật khẩu là bắt buộc.');
+    const ppErr = Validate.passphrase(passphrase);
+    if (ppErr) throw new Error(ppErr);
+
     const data = await api('POST', '/auth/login', { username, password });
     Object.assign(State, { token: data.sessionToken, userID: data.userID, username: data.username, displayName: data.displayName, encPrivKey: data.encPrivKey });
 
@@ -265,7 +308,9 @@ async function openChat(contactUserID) {
 //  Messaging
 // ─────────────────────────────────────────────
 async function sendMessage(plaintext) {
-  if (!State.currentContact || !plaintext.trim()) return;
+  if (!State.currentContact) return;
+  const msgErr = Validate.message(plaintext);
+  if (msgErr) { ui.toast(msgErr, 'warn'); return; }
   try {
     // Bug 1: always re-fetch receiver's latest public key before encrypting
     // (in case they revoked and regenerated their key while chat was open)
@@ -396,6 +441,14 @@ async function loadHistory(contactID, page=1) {
 }
 
 async function revokeAndRegenKey(passphrase, reason) {
+  // GUARD: verify passphrase is correct by trying to decrypt current private key first.
+  // If wrong passphrase → abort immediately, do NOT revoke the old key.
+  try {
+    await E2EE.decryptPrivateKey(State.encPrivKey, passphrase);
+  } catch {
+    throw new Error('Passphrase không đúng. Không thể thu hồi khóa.');
+  }
+
   await api('POST', '/keys/revoke', { reason });
   const { pubKeyB64, encPrivKey } = await E2EE.generateKeyPair(passphrase);
   Object.assign(State, { pubKeyB64, encPrivKey });
