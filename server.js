@@ -1,45 +1,22 @@
-const express   = require('express');
+/**
+ * server.js — HTTP Server + Socket.IO
+ * 
+ * Import Express app từ expressApp.js, thêm Socket.IO, rồi listen().
+ * File này KHÔNG được import bởi test files.
+ */
 const http      = require('http');
 const { Server } = require('socket.io');
-const cors      = require('cors');
-const path      = require('path');
 const jwt       = require('jsonwebtoken');
 const db        = require('./db');
 const { JWT_SECRET } = require('./middleware/auth');
+const { app, socketRegistry } = require('./expressApp');
 
-const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
 const PORT = process.env.PORT || 3000;
-
-// ─────────────────────────────────────────────
-//  Middleware
-// ─────────────────────────────────────────────
-app.use(cors());
-app.use(express.json({ limit: '2mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
-
-// ─────────────────────────────────────────────
-//  Socket registry: userID → socket instance
-//  Used by messages route for real-time delivery
-// ─────────────────────────────────────────────
-const socketRegistry = new Map();
-
-// ─────────────────────────────────────────────
-//  Routes
-// ─────────────────────────────────────────────
-const messagesRouter = require('./routes/messages');
-const contactsRouter = require('./routes/contacts');
-messagesRouter.setSocketRegistry(socketRegistry);
-contactsRouter.setSocketRegistry(socketRegistry);
-
-app.use('/api/auth',     require('./routes/auth'));
-app.use('/api/keys',     require('./routes/keys'));
-app.use('/api/messages', messagesRouter);
-app.use('/api/contacts', contactsRouter);
 
 // ─────────────────────────────────────────────
 //  Socket.IO — real-time messaging
